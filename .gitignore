@@ -1,0 +1,81 @@
+# Build output — applies throughout the repository
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+[Ll]og/
+[Ll]ogs/
+*.log
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.sln.ide
+
+# JetBrains Rider / ReSharper
+.idea/
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# VS Code — keep shared settings and launch configurations
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Test results and code coverage
+[Tt]est[Rr]esults/
+coverage/
+coverage-report/
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+# NuGet — restored packages and generated packages
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nupkg
+*.snupkg
+
+# Publish output and local publish settings
+[Pp]ublish/
+*.pubxml
+*.publishproj
+PublishScripts/
+
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+*.pfx
+*.p12
+
+# Azure Functions local settings
+local.settings.json
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
