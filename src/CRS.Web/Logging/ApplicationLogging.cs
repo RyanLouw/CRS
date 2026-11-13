@@ -27,6 +27,7 @@ public static class ApplicationLogging
         Directory.CreateDirectory(directory);
         return logger.MinimumLevel.Information()
             .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+            .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
             // HTTP client default diagnostics can contain URLs with sensitive query parameters.
             .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
             .Enrich.FromLogContext()

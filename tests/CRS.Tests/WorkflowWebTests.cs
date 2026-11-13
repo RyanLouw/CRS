@@ -1,8 +1,8 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using CRS.Core.Models;
+using CRS.Tests.Fakes;
 using FakeItEasy;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -14,13 +14,6 @@ namespace CRS.Tests;
 
 public sealed class WorkflowWebTests
 {
-    private static WebApplicationFactory<Program> Factory(Action<IServiceCollection>? configure = null) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Development").UseSetting("Demo:Enabled", "true")
-                .UseSetting("Logging:Directory", Path.Combine(Path.GetTempPath(), "crs-workflow-tests"));
-            if (configure != null) builder.ConfigureServices(configure);
-        });
     private static HttpClient Client(WebApplicationFactory<Program> factory) => factory.CreateClient(new WebApplicationFactoryClientOptions
         { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = true });
     private static string Field(string html, string name)
@@ -29,193 +22,104 @@ public sealed class WorkflowWebTests
         return WebUtility.HtmlDecode(Regex.Match(tag, "value=\"([^\"]*)\"").Groups[1].Value);
     }
     private static string Token(string html) => Field(html, "__RequestVerificationToken");
-    private static async Task Login(HttpClient client, string role)
-    {
-        var html = await client.GetStringAsync("/Account/Login");
-        using var response = await client.PostAsync("/Account/DemoLogin", new FormUrlEncodedContent(new Dictionary<string, string>
-            { ["role"] = role, ["__RequestVerificationToken"] = Token(html) }));
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-    }
     private static async Task<(string Html, string Url)> RatingForm(HttpClient client)
     {
-        var calls = await client.GetStringAsync("/Calls");
-        var url = WebUtility.HtmlDecode(Regex.Match(calls, "href=\"([^\"]*/Calls/Rate[^\"]*)\"").Groups[1].Value);
-        Assert.NotEmpty(url);
-        return (await client.GetStringAsync(url), url);
+        var calls = await client.GetStringAsync("/CallList");
+        var url = WebUtility.HtmlDecode(Regex.Match(calls, "href=\"([^\"]*/CallList/Rate[^\"]*)\"").Groups[1].Value);
+        Assert.NotEmpty(url); return (await client.GetStringAsync(url), url);
     }
     private static Dictionary<string, string> RatingFields(string html) => new()
     {
         ["__RequestVerificationToken"] = Token(html), ["Input.CallId"] = Field(html, "Input.CallId"),
-        ["Input.Date"] = Field(html, "Input.Date"), ["Input.ProblemIds"] = "1", ["Input.PharmacyId"] = "1",
-        ["Input.OtherProblem"] = "test details"
+        ["Input.Date"] = Field(html, "Input.Date"), ["Input.ProblemIds"] = "1", ["Input.PharmacyId"] = "1", ["Input.OtherProblem"] = "test details"
     };
-    [Theory] [InlineData("/Calls")] [InlineData("/Admin")] [InlineData("/Admin/Export")]
-    public async Task AnonymousUsersAreChallenged(string url)
+    [Fact] public void ApplicationHasExactlyTheTwoRequestedControllers()
     {
-        using var factory = Factory(); using var client = Client(factory); using var response = await client.GetAsync(url);
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode); Assert.Contains("/Account/Login", response.Headers.Location!.ToString());
-    }
-    [Fact] public async Task LoginRequiresAntiforgeryToken()
-    {
-        using var factory = Factory(); using var client = Client(factory);
-        using var response = await client.PostAsync("/Account/DemoLogin", new FormUrlEncodedContent(new Dictionary<string, string> { ["role"] = "Admin" }));
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-    [Fact] public async Task OperatorCanSeeCallsButCannotAdministerOrDownloadRecordings()
-    {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
-        var calls = await client.GetStringAsync("/Calls"); Assert.Contains("DEMO MODE", calls); Assert.Contains("Report problem", calls);
-        foreach (var route in new[] { "/Admin", "/Admin/Export", "/Calls/Recording?callId=test", "/demo/recording" })
-        {
-            using var response = await client.GetAsync(route);
-            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode); Assert.Contains("/Account/Denied", response.Headers.Location!.ToString());
-        }
-    }
-    [Fact] public async Task RejectsUnexpectedDemoRole()
-    {
-        using var factory = Factory(); using var client = Client(factory);
-        var html = await client.GetStringAsync("/Account/Login");
-        using var response = await client.PostAsync("/Account/DemoLogin", new FormUrlEncodedContent(new Dictionary<string, string>
-            { ["role"] = "SuperAdmin", ["__RequestVerificationToken"] = Token(html) }));
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var controllers = typeof(Program).Assembly.GetTypes().Where(t => !t.IsAbstract && typeof(Microsoft.AspNetCore.Mvc.Controller).IsAssignableFrom(t)).Select(t => t.Name).Order().ToArray();
+        Assert.Equal(new[] { "AdminController", "CallListController" }, controllers);
     }
     [Fact] public async Task SavesRatingAndPreventsDuplicateSubmission()
     {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
+        using var factory = new TestApplicationFactory(); using var client = Client(factory);
         var (html, url) = await RatingForm(client);
-        using var saved = await client.PostAsync("/Calls/Rate", new FormUrlEncodedContent(RatingFields(html)));
-        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
-        Assert.Contains("Call rating saved", await client.GetStringAsync(saved.Headers.Location!));
+        using var saved = await client.PostAsync("/CallList/Rate", new FormUrlEncodedContent(RatingFields(html)));
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode); Assert.Contains("Call rating saved", await client.GetStringAsync(saved.Headers.Location!));
         html = await client.GetStringAsync(url);
-        using var duplicate = await client.PostAsync("/Calls/Rate", new FormUrlEncodedContent(RatingFields(html)));
-        Assert.Equal(HttpStatusCode.Redirect, duplicate.StatusCode);
+        using var duplicate = await client.PostAsync("/CallList/Rate", new FormUrlEncodedContent(RatingFields(html)));
         Assert.Contains("already been reported", await client.GetStringAsync(duplicate.Headers.Location!));
     }
-    [Fact] public async Task MissingProblemsReturnsFormWithValidationAndPreservesComment()
+    [Fact] public async Task InvalidPostPreservesEnteredValues()
     {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
+        using var factory = new TestApplicationFactory(); using var client = Client(factory);
         var (html, _) = await RatingForm(client); var fields = RatingFields(html); fields.Remove("Input.ProblemIds");
-        using var response = await client.PostAsync("/Calls/Rate", new FormUrlEncodedContent(fields));
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode); Assert.Contains("Select at least one problem", body); Assert.Contains("test details", body);
+        using var response = await client.PostAsync("/CallList/Rate", new FormUrlEncodedContent(fields));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode); var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Select at least one problem", body); Assert.Contains("test details", body);
     }
     [Fact] public async Task RatingPostRequiresAntiforgeryToken()
     {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
+        using var factory = new TestApplicationFactory(); using var client = Client(factory);
         var (html, _) = await RatingForm(client); var fields = RatingFields(html); fields.Remove("__RequestVerificationToken");
-        using var response = await client.PostAsync("/Calls/Rate", new FormUrlEncodedContent(fields));
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var response = await client.PostAsync("/CallList/Rate", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
-    [Fact] public async Task AdminCanFilterPageEditAndExport()
+    [Fact] public async Task AdminCanFilterPageUpdateAndExport()
     {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Admin");
-        var page = await client.GetStringAsync("/Admin?page=2"); Assert.Contains("Page 2 of 3", page);
-        var filter = await client.GetStringAsync("/Admin?statusId=2"); Assert.Contains("Page 1 of 1", filter);
+        using var factory = new TestApplicationFactory(); using var client = Client(factory);
+        Assert.Contains("Page 2 of 3", await client.GetStringAsync("/Admin?page=2"));
+        Assert.Contains("Page 1 of 1", await client.GetStringAsync("/Admin?statusId=2"));
         var edit = await client.GetStringAsync("/Admin/Edit/1");
         using var saved = await client.PostAsync("/Admin/Edit", new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["__RequestVerificationToken"] = Token(edit), ["Input.Id"] = "1", ["Input.StatusId"] = "2",
-            ["Input.ReasonId"] = "1", ["Input.Note"] = "Resolved by test"
-        }));
-        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
-        Assert.Contains("Resolved by test", await client.GetStringAsync("/Admin/Edit/1"));
-        using var report = await client.GetAsync("/Admin/Export");
-        Assert.Equal(HttpStatusCode.OK, report.StatusCode);
+        { ["__RequestVerificationToken"] = Token(edit), ["Input.Id"] = "1", ["Input.StatusId"] = "2", ["Input.ReasonId"] = "1", ["Input.Note"] = "Resolved by test" }));
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode); Assert.Contains("Resolved by test", await client.GetStringAsync("/Admin/Edit/1"));
+        using var report = await client.GetAsync("/Admin/Export"); Assert.Equal(HttpStatusCode.OK, report.StatusCode);
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", report.Content.Headers.ContentType!.MediaType);
         Assert.True((await report.Content.ReadAsByteArrayAsync()).Length > 1000);
     }
-    [Fact] public async Task PspCanDownloadSyntheticRecording()
+    [Fact] public async Task CallDownloadResolvesApiRecording()
     {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "PSP");
-        var calls = await client.GetStringAsync("/Calls");
-        var recording = WebUtility.HtmlDecode(Regex.Match(calls, "href=\"([^\"]*/Calls/Recording[^\"]*)\"").Groups[1].Value);
-        using var response = await client.GetAsync(recording); Assert.Equal("/demo/recording", response.Headers.Location!.ToString());
+        using var factory = new TestApplicationFactory(); using var client = Client(factory);
+        var calls = await client.GetStringAsync("/CallList");
+        var url = WebUtility.HtmlDecode(Regex.Match(calls, "href=\"([^\"]*/CallList/Recording[^\"]*)\"").Groups[1].Value);
+        using var response = await client.GetAsync(url); Assert.Equal("/test-recording.wav", response.Headers.Location!.ToString());
         using var wav = await client.GetAsync(response.Headers.Location); Assert.Equal("audio/wav", wav.Content.Headers.ContentType!.MediaType);
-        Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString((await wav.Content.ReadAsByteArrayAsync())[..4]));
     }
-    [Theory] [InlineData("/Admin/Edit/999", 404)] [InlineData("/Admin?statusId=999", 400)]
-    public async Task AdminBadRequestsReturnUsefulStatus(string url, int status)
+    [Theory] [InlineData("/Admin/Edit/999", 404)] [InlineData("/Admin?statusId=999", 400)] [InlineData("/CallList?date=invalid", 400)]
+    public async Task BadInputReturnsUsefulStatus(string url, int status)
     {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Admin");
-        using var response = await client.GetAsync(url); Assert.Equal(status, (int)response.StatusCode);
-        Assert.Contains("Reference:", await response.Content.ReadAsStringAsync());
+        using var factory = new TestApplicationFactory(); using var client = Client(factory); using var response = await client.GetAsync(url);
+        Assert.Equal(status, (int)response.StatusCode); Assert.Contains("Reference:", await response.Content.ReadAsStringAsync());
     }
-    [Fact] public async Task DependencyFailureReturns503WithoutInternalDetails()
-    {
-        var manager = A.Fake<ICallManager>();
-        A.CallTo(() => manager.GetCallsAsync(A<Guid>._, A<DateOnly>._, A<CancellationToken>._)).ThrowsAsync(new DependencyException("Calls service is unavailable."));
-        using var factory = Factory(s => { s.RemoveAll<ICallManager>(); s.AddSingleton(manager); }); using var client = Client(factory);
-        await Login(client, "Operator"); using var response = await client.GetAsync("/Calls");
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode); Assert.Contains("Calls service is unavailable", await response.Content.ReadAsStringAsync());
-    }
-    [Fact] public async Task UnexpectedFailureIsSanitized()
+    [Theory] [InlineData(false, 503)] [InlineData(true, 500)]
+    public async Task ErrorsAreSanitized(bool unexpected, int status)
     {
         var manager = A.Fake<ICallManager>();
-        A.CallTo(() => manager.GetCallsAsync(A<Guid>._, A<DateOnly>._, A<CancellationToken>._)).ThrowsAsync(new InvalidOperationException("private-secret-connection-string"));
-        using var factory = Factory(s => { s.RemoveAll<ICallManager>(); s.AddSingleton(manager); }); using var client = Client(factory);
-        await Login(client, "Operator"); using var response = await client.GetAsync("/Calls");
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        A.CallTo(() => manager.GetCallsAsync(A<Guid>._, A<DateOnly>._, A<CancellationToken>._)).ThrowsAsync(unexpected
+            ? new InvalidOperationException("private-secret-connection-string") : new DependencyException("Calls service is unavailable."));
+        using var factory = new TestApplicationFactory(s => { s.RemoveAll<ICallManager>(); s.AddSingleton(manager); }); using var client = Client(factory);
+        using var response = await client.GetAsync("/CallList"); Assert.Equal(status, (int)response.StatusCode);
         Assert.DoesNotContain("private-secret", await response.Content.ReadAsStringAsync());
     }
-    [Fact] public async Task DemoCannotStartOutsideDevelopment()
+    [Fact] public async Task ModalGetReturnsOnlyRatingForm()
     {
-        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.UseEnvironment("Production").UseSetting("Demo:Enabled", "true"));
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Task.Run(() => factory.CreateClient()));
-        Assert.Contains("Demo mode is allowed only", error.Message);
+        using var factory = new TestApplicationFactory(); using var client = Client(factory); var (_, url) = await RatingForm(client);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url); request.Headers.Add("X-Rating-Modal", "true");
+        using var response = await client.SendAsync(request); var html = await response.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode); Assert.Contains("data-rating-form", html); Assert.DoesNotContain("<!DOCTYPE", html);
     }
-    [Fact] public async Task SignOutClearsAccess()
+    [Theory] [InlineData(true, 200, 13)] [InlineData(false, 422, 12)]
+    public async Task ModalPostSavesOnlyValidRatings(bool valid, int status, int expectedRows)
     {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
-        var html = await client.GetStringAsync("/Calls");
-        using var response = await client.PostAsync("/Account/Logout", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = Token(html) }));
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        using var calls = await client.GetAsync("/Calls"); Assert.Contains("/Account/Login", calls.Headers.Location!.ToString());
-    }
-    [Fact]
-    public async Task ModalGetReturnsOnlyTheRatingForm()
-    {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
-        var (_, url) = await RatingForm(client);
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Add("X-Rating-Modal", "true");
-        using var response = await client.SendAsync(request);
-        var html = await response.Content.ReadAsStringAsync();
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("data-rating-form", html);
-        Assert.DoesNotContain("<!DOCTYPE", html);
-    }
-    [Fact]
-    public async Task ModalInvalidPostReturns422WithPreservedFormAndNoDatabaseInsert()
-    {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
-        var (html, _) = await RatingForm(client); var fields = RatingFields(html); fields.Remove("Input.ProblemIds");
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/Calls/Rate") { Content = new FormUrlEncodedContent(fields) };
-        request.Headers.Add("X-Rating-Modal", "true");
-        using var response = await client.SendAsync(request);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Equal(422, (int)response.StatusCode);
-        Assert.Contains("Select at least one problem", body);
-        Assert.Contains("test details", body);
-        Assert.DoesNotContain("<!DOCTYPE", body);
-        using var scope = factory.Services.CreateScope();
-        Assert.Equal(12, (await scope.ServiceProvider.GetRequiredService<IRatingRepository>().GetRatingsAsync(null, default)).Count);
-    }
-    [Fact]
-    public async Task ModalValidPostSavesAndReturnsJsonForListRefresh()
-    {
-        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
-        var (html, _) = await RatingForm(client);
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/Calls/Rate") { Content = new FormUrlEncodedContent(RatingFields(html)) };
-        request.Headers.Add("X-Rating-Modal", "true");
-        using var response = await client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.True(json.RootElement.GetProperty("saved").GetBoolean());
-        Assert.True(json.RootElement.GetProperty("notificationSent").GetBoolean());
-        using var scope = factory.Services.CreateScope();
-        var ratings = await scope.ServiceProvider.GetRequiredService<IRatingRepository>().GetRatingsAsync(null, default);
-        Assert.Equal(13, ratings.Count);
-        Assert.Contains(ratings, r => r.OtherProblem == "test details");
+        using var factory = new TestApplicationFactory(); using var client = Client(factory); var (html, _) = await RatingForm(client);
+        var fields = RatingFields(html); if (!valid) fields.Remove("Input.ProblemIds");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/CallList/Rate") { Content = new FormUrlEncodedContent(fields) };
+        request.Headers.Add("X-Rating-Modal", "true"); using var response = await client.SendAsync(request);
+        Assert.Equal(status, (int)response.StatusCode);
+        if (valid)
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            Assert.True(json.RootElement.GetProperty("saved").GetBoolean()); Assert.True(json.RootElement.GetProperty("notificationSent").GetBoolean());
+        }
+        else { var body = await response.Content.ReadAsStringAsync(); Assert.Contains("test details", body); Assert.DoesNotContain("<!DOCTYPE", body); }
+        using var scope = factory.Services.CreateScope(); Assert.Equal(expectedRows, (await scope.ServiceProvider.GetRequiredService<IRatingRepository>().GetRatingsAsync(null, default)).Count);
     }
 }

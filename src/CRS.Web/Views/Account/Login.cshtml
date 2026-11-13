@@ -1,8 +1,0 @@
-@{ ViewData["Title"] = "Demo sign-in"; }
-<h1>Development demo</h1>
-<p>Choose an account to review the workflow. All calls and users are synthetic. Changes are held in memory and reset when the server restarts. Emails are simulated.</p>
-<form asp-action="DemoLogin" method="post" class="demo-accounts">
-    <button name="role" value="Operator" class="btn btn-primary">Demo operator</button>
-    <button name="role" value="PSP" class="btn btn-outline-primary">Demo operator with recordings</button>
-    <button name="role" value="Admin" class="btn btn-outline-primary">Demo administrator</button>
-</form>

@@ -31,6 +31,10 @@ public sealed record CallRating
     public DateTime CaptureDate { get; init; }
     public string Extension { get; init; } = "";
     public DateTime? CallDateTime { get; init; }
+    public string? CallDate { get; init; }
+    public string? CallTime { get; init; }
+    public bool? WiFi { get; init; }
+    public bool? LAN { get; init; }
     public string NumberPhoned { get; init; } = "";
     public string Problems { get; init; } = "";
     public string? OtherProblem { get; init; }

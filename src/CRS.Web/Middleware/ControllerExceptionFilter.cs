@@ -1,10 +1,12 @@
 using CRS.Core.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Serilog;
 
-namespace CRS.Security;
+namespace CRS.Middleware;
 
-public sealed class WorkflowExceptionFilter(ILogger<WorkflowExceptionFilter> logger) : IExceptionFilter
+// Translate business/dependency errors into MVC responses; this is not authentication code.
+public sealed class ControllerExceptionFilter : IExceptionFilter
 {
     public void OnException(ExceptionContext context)
     {
@@ -16,12 +18,10 @@ public sealed class WorkflowExceptionFilter(ILogger<WorkflowExceptionFilter> log
             DependencyException ex => (503, ex.Message),
             _ => (500, "The operation could not be completed. Please contact IT with the reference below.")
         };
-        logger.LogWarning("Workflow failed with {ErrorType}; status {StatusCode}; trace {TraceId}",
-            context.Exception.GetType().Name, status, context.HttpContext.TraceIdentifier);
-        var result = new ViewResult { ViewName = "WorkflowError", StatusCode = status,
+        Log.Warning("Controller operation failed with {ErrorType}; trace {TraceId}", context.Exception.GetType().Name, context.HttpContext.TraceIdentifier);
+        context.Result = new ViewResult { ViewName = "WorkflowError", StatusCode = status,
             ViewData = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary<string>(
                 new Microsoft.AspNetCore.Mvc.ModelBinding.EmptyModelMetadataProvider(), context.ModelState) { Model = message } };
-        context.Result = result;
         context.ExceptionHandled = true;
     }
 }

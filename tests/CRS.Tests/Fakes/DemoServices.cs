@@ -1,10 +1,10 @@
 using CRS.Core.Models;
 using Microsoft.Extensions.Logging;
 
-namespace CRS.Core.Demo;
+namespace CRS.Tests.Fakes;
 
-// Shared, in-memory development data. Never registered outside explicit Development demo mode.
-public sealed class DemoServices(TimeProvider clock, ILogger<DemoServices> logger) : IRatingRepository, ICallApi, IRatingNotifier
+// Test-only in-memory fixtures. Production projects never reference this assembly.
+public sealed class DemoServices(TimeProvider clock, ILogger<DemoServices> logger) : IRatingRepository, IRatingNotifier
 {
     public static readonly Guid OperatorId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     public static readonly Guid AdminId = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -84,8 +84,8 @@ public sealed class DemoServices(TimeProvider clock, ILogger<DemoServices> logge
     public Task<string?> GetRecordingAsync(string key, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        // The controller returns a short generated WAV for this fixed local destination.
-        return Task.FromResult<string?>("/demo/recording");
+        // The test-host middleware supplies this synthetic recording.
+        return Task.FromResult<string?>("/test-recording.wav");
     }
     public Task NotifyAsync(CallRating rating, bool updated, CancellationToken ct)
     {

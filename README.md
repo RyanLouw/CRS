@@ -1,28 +1,29 @@
 # Call Rating System — ASP.NET Core MVC
 
-The active call-rating workflow is migrated to .NET 10. Open **CRS.slnx** in a .NET 10-compatible IDE, such as Visual Studio 2026, or use the CLI. The old Framework 4.8 application is a separate `CallRatingSystem` project in the same root solution. It is excluded from default solution builds because it requires Windows/Visual Studio WebApplication targets and its legacy dependencies. Enable its Build checkbox in Visual Studio Configuration Manager only when you intend to build it with those prerequisites installed.
-
-The repository has one solution and three application projects (plus tests):
+Open the root **CRS.slnx** in a .NET 10-compatible IDE. It contains:
 
 ```text
-CRS.slnx
-CallRatingSystem/          # Existing Framework 4.8 application
-src/CRS.Web/               # New ASP.NET Core MVC application
-src/CRS.Core/              # Models, managers, API and database access
-tests/CRS.Tests/           # Tests of the new application
+CallRatingSystem/             Existing Framework 4.8 project (default build excluded)
+src/CRS.Web/                  MVC views, two controllers, middleware, Program.cs
+src/CRS.Core/                 Models, managers, data access, EF Core contexts
+tests/CRS.Tests/             Unit/integration tests and all fake/demo implementations
 ```
 
-The old `CRS/CRS/CallRatingSystem` duplicate and nested solution files have been removed. Open the root `CRS.slnx`; there is no remaining combined `CRS.csproj`.
+## Application structure
 
-- **CallRatingSystem**: original legacy project, included for reference and separate Windows builds.
-- **CRS.Core**: models, call/help-desk managers, SQL Server repository, calls API client, email notifications, Excel generation, and development demo adapters.
-- **CRS.Web**: controllers, Razor views, authentication/authorization, application composition and Serilog. Reuses the original HW logo, theme CSS, colours, rounded buttons and floating call/rating cards with responsive MVC layout adjustments.
-- **CRS.Tests**: xUnit + FakeItEasy unit tests and authenticated HTTP integration tests.
-- **tests/browser**: repeatable Playwright browser walkthrough.
+- **CallListController**: normal-user call cards, rating popup, save and recording download.
+- **AdminController**: help-desk/IT review, filters, paging, updates, recordings and Excel export.
+- **CallApiDataAccess**: one ordinary class receiving an `HttpClient`. Calls the existing call-list and recording endpoints. `Program.cs` sets its base URL. No API auth/token provider/options hierarchy.
+- **CallRatingContext**: EF Core context mapped to the existing ratings and lookup tables.
+- **ADUsersContext**: EF Core mapping for `ADUsers.dbo.ADUser`, which lives in the legacy system's separate directory database. Configure the Users connection to that database.
+- **CallRatingDataAccess**: EF LINQ queries and `SaveChangesAsync` for reads/writes. No raw SQL executor or stored-procedure repository. Managers still validate and coordinate saves and email notifications.
+- **ControllerLoggingMiddleware**: runs after routing and logs only matched MVC controller actions, including outcome, elapsed time and trace reference. Static assets and unmatched routes are ignored. Functions use Serilog directly for their operation/error events.
 
-## Run locally without credentials
+The old `CRS/CRS/CallRatingSystem` duplicate and nested solution files are removed. The single legacy project is in the same root solution but requires Windows/Visual Studio WebApplication tooling to build; enable its Build checkbox in Configuration Manager when those dependencies are available.
 
-Install the .NET 10 SDK, then from this directory:
+## Configure and run the real application
+
+Install .NET 10, then:
 
 ```sh
 dotnet restore CRS.slnx --locked-mode
@@ -31,79 +32,54 @@ dotnet test CRS.slnx --no-build
 dotnet run --project src/CRS.Web --launch-profile http
 ```
 
-The `http` launch profile enables Development and uses port 5174. Open the app in your local browser, choose **Sign in**, then a demo operator, operator with recordings (PSP), or administrator. Development enables demo mode by default. Alternatively:
-
-```sh
-dotnet run --project src/CRS.Web --no-launch-profile --environment Development --urls http://127.0.0.1:5174
-```
-
-Demo mode is labelled on every screen, uses synthetic calls/ratings, simulates email, and provides a generated WAV rather than a real recording. Changes are in memory and reset when the server restarts. There is no development sign-in route available in live mode. Startup rejects demo mode outside Development.
-
-## Walk through the migrated features
-
-1. Sign in as demo operator. Select a date and refresh calls. Each card shows only call details and the permitted recording download button. Click a card (or focus it and press Enter) to open the help-desk popup.
-2. In the popup, choose problems and a pharmacy. “Other” requires details. Invalid choices are rejected server-side and remain in the popup with the entered values. Closing the popup cancels without saving. The download button acts independently and does not select the card. Saving persists the rating before notifying help desk; notification failure explicitly reports that the save succeeded. Repeated submissions do not insert duplicates.
-3. Sign out and sign in as the recording-enabled operator to download a synthetic recording.
-4. Sign in as administrator. Filter by status, page through ratings, review a rating, set its status/reason and add IT notes. Closing a live rating sends feedback to its user when their email exists, as well as a help-desk notification.
-5. Export the selected status filter to Excel. The export writes caller-supplied text as text, not spreadsheet formulas.
-
-The old paging procedure subtracts IDs and can skip filtered rows or gaps. The new manager pages the actual filtered, consistently ordered result in groups of five. It currently materializes `CSP_GetCallRating` for paging and export, matching the old full-result count approach; large deployments can replace this with true SQL OFFSET/count queries.
-
-## Endpoints and permissions
-
-| Route | Behaviour | Access |
-| --- | --- | --- |
-| `GET /Calls?date=yyyy-MM-dd` | Call list for the signed-in user's directory extension | Signed in |
-| `GET/POST /Calls/Rate` | Load/submit rating popup; full-page fallback without JavaScript | Signed in; server rechecks call ownership |
-| `GET /Calls/Recording?callId=…&date=…` | Resolve recording through API | PSP, IT, Admin; own extension |
-| `GET /Admin?page=1&statusId=…` | Filtered five-row help-desk pages | IT, Admin |
-| `GET/POST /Admin/Edit` | Review/update persisted rating | IT, Admin |
-| `GET /Admin/Recording?id=…` | Resolve stored rating recording | IT, Admin |
-| `GET /Admin/Export?statusId=…` | Download XLSX report | IT, Admin |
-| `GET /Account/Login` | Microsoft sign-in, or demo account selection | Public |
-| `POST /Account/Logout` | Sign out | Signed in |
-
-POST forms use antiforgery protection. Permissions are enforced by server policies, not only hidden buttons. Roles are exact `IT`, `Admin`, `PSP` claims. The operator extension, call details, and update author are resolved on the server rather than accepted from hidden browser fields.
-
-Outgoing API requests preserve the legacy contracts:
-
-- `POST api/3cx/call-logs/by-extension`: JSON `{ extension, callType: "Both", date }`.
-- `GET api/3cx/call-logs/call-url/{escapedFilename}`: expects `{ "url": "https://…" }`.
-
-The configured API client uses per-request bearer authentication, finite timeouts, cancellation, safe user-facing errors, and no automatic redirects. Recording redirects require HTTPS and an explicit allowed hostname. No private Framework-only HW package is required by the new projects.
-
-## Connect live services when you are ready
-
-API keys and live identity/service configuration are left for the owner to supply. Set `Demo__Enabled=false`. Use environment variables, your deployment secret store, or .NET user secrets (`dotnet user-secrets --project src/CRS.Web …`). Never put secret values in tracked JSON. Configuration names:
+Set connection values externally using environment variables, user secrets (`dotnet user-secrets --project src/CRS.Web …`) or deployment configuration:
 
 | Setting | Purpose |
 | --- | --- |
-| `Database__CallRating` | SQL Server CallRatingSystem database connection string |
-| `Database__Users` | SQL Server ADUsers database connection string |
-| `CallApi__BaseUrl` | HTTPS base URL of calls API |
-| `CallApi__AccessToken` | Bearer token, supplied securely |
-| `CallApi__RecordingHosts__0` (and subsequent indices) | Allowed recording download hostnames, without URL schemes/paths |
-| `CallApi__TimeoutSeconds` | Timeout, clamped to 1–120 seconds; default 30 |
-| `AzureAd__TenantId`, `AzureAd__ClientId`, `AzureAd__ClientSecret` | Microsoft OIDC application configuration; callback `/signin-oidc` |
-| `Smtp__Host`, `Smtp__Port`, `Smtp__From`, `Smtp__HelpDesk` | Mail server and recipients; TLS required |
-| `Smtp__Username`, `Smtp__Password` | SMTP credentials when required |
+| `CallApi__BaseUrl` | Base URL, configured on `AddHttpClient<CallApiDataAccess>` in Program.cs |
+| `Database__CallRating` | Existing CallRatingSystem SQL Server database |
+| `Database__Users` | Existing ADUsers SQL Server database |
+| `CurrentUser__Id` | Temporary server-configured directory user GUID until you wire sign-in |
+| `Smtp__Host`, `Smtp__Port`, `Smtp__From`, `Smtp__HelpDesk` | Email delivery settings; default port 587 with TLS |
+| `Smtp__Username`, `Smtp__Password` | SMTP credentials if needed |
 | `Logging__Directory` | Absolute log folder override |
 
-`IAccessTokenProvider` is the replacement point for your existing token acquisition/renewal service. The included provider reads a securely configured bearer token; it does not reproduce the unavailable private HW central-config token protocol. You can wire that provider separately. Live Microsoft sign-in validates the configured tenant issuer; configure app roles and your deployment callback/logout addresses in Entra.
+Authentication and role enforcement are deliberately left for you to connect later. There is no sign-in controller, Security folder, role-policy scaffolding, or demo branch in production code. `CurrentUser:Id` is a temporary server-side identity hookup, not authentication. Both controllers currently have no access policy. Replace that lookup with your signed-in user's directory ID and add your user/IT/admin permissions when wiring authentication. API authorization headers can be added to the configured HttpClient when ready; the data-access class does not require any authentication setup now.
 
-The supplied SQL is retained in `database/CallRatingSystemDemo.sql` for review/import into an appropriate development database. It is not executed by app startup. It requires the `ADUsers.dbo.ADUser` directory table and existing active lookup data, neither of which was included in the supplied script. New ratings use status 1 = Open; closure uses status 2 = Closed. The new repository uses the supplied lookup/list/add/update procedures and parameterized user/rating lookups. Duplicate check + insert and update existence checks use SQL transactions and locking. The old ID-arithmetic paging procedure is not used. Review database permissions and test against a development SQL Server before production use.
+The production app always uses the actual data-access/EF/email registrations. It does not fall back to fake data if configuration is missing. The supplied `database/CallRatingSystemDemo.sql` documents the existing tables; no schema creation, migration or seed runs automatically. Apply/manage your development schema and its ADUsers/lookup data separately. EF maps nullable legacy columns and preserves the text CallDate/CallTime fields when saving. New ratings use status 1 = Open; closure uses 2 = Closed.
 
-Live SQL, calls API, SMTP and Microsoft sign-in were not contacted during development; adapters were exercised with controlled test dependencies. The owner will complete those connection checks. The unused, commented-out task/patient controls are not part of the active call-rating screens and are not migrated.
+## Existing screen interaction
 
-## Logging
+Open `/CallList` (also the default `/`). A card shows call information and its available download button. Selecting the card opens the help-desk popup for problems, pharmacy and other details. The download button does not select the card. Cancel closes the popup without saving. Server validation stays in the popup with entered values preserved. A successful submission saves the database row first, then sends email; delivery failure reports that the save succeeded. Duplicate submissions are checked in a serializable EF transaction.
 
-Serilog writes application lifecycle, operation outcomes, request completion/failures and dependency errors to console and daily rolling files. Windows defaults to `C:\CallRatingSystem\Logs\crs-YYYYMMDD.log`; Linux defaults to `Logs` beneath the Web content root. The application identity needs write permission.
+`/Admin` shows rating cards, status filters and five-row paging. Updates persist status, reason, note and audit information and notify help desk; closing also emails the rating owner when an address exists. Excel export uses literal text cells for user-entered content. The original HW logo, CSS theme, colours and floating cards are reused locally.
 
-Retention is seven days, applied when a file opens/rolls (startup, daily roll, or the 100 MB size limit). No cleanup process runs while the app is stopped. Request events omit raw paths, queries, headers and bodies; a final enricher also removes request-path properties introduced by ASP.NET logging scopes. Dependency logs record error types/status codes, not tokens, connection strings or caller data. Do not add sensitive values to future log messages or exception text. Logs/build artifacts are ignored by Git. Existing legacy Web.config credentials were not copied into the new projects; previously exposed credentials/history remain a separate cleanup task.
+| Route | Action |
+| --- | --- |
+| `GET /CallList?date=yyyy-MM-dd` | Calls for the current user's directory extension |
+| `GET/POST /CallList/Rate` | Load/submit popup; full-page fallback without JavaScript |
+| `GET /CallList/Recording?callId=…&date=…` | Resolve the selected call's recording |
+| `GET /Admin?page=1&statusId=…` | Help-desk list/filter/page |
+| `GET/POST /Admin/Edit` | Review/update a rating |
+| `GET /Admin/Recording?id=…` | Resolve a saved rating's recording |
+| `GET /Admin/Export?statusId=…` | Excel report |
 
-## Repeat the browser checks
+The API data-access class uses the original endpoint contracts:
 
-Start a fresh demo server first (the walkthrough expects initial demo state). With Node 22+:
+- `POST api/3cx/call-logs/by-extension` with JSON `{ extension, callType: "Both", date }`.
+- `GET api/3cx/call-logs/call-url/{escapedFilename}` returning `{ "url": "https://…" }`.
+
+## Run fake data only from the testing project
+
+All demo data, simulated email, fake HTTP responses and the synthetic WAV are in **CRS.Tests**. Core/Web never reference the test project. To walk through screens without services, explicitly start the test-project host:
+
+```sh
+dotnet run --project tests/CRS.Tests --configuration Release -- 5174
+```
+
+This uses .NET's WebApplicationFactory/Kestrel test host to substitute the real registrations with test fixtures. It is a test executable, not a production runtime mode. Data resets when it restarts, and no real email is sent.
+
+For automated Chromium checks, start a fresh test host, then with Node 22+:
 
 ```sh
 npm ci --prefix tests/browser
@@ -113,6 +89,10 @@ cd ../..
 npm test --prefix tests/browser
 ```
 
-`CRS_BASE_URL` overrides the default local port 5174; `CHROMIUM_PATH` selects an existing browser executable. Linux may need `npx playwright install --with-deps chromium`. The script exercises operator sign-in, rating validation/save, duplicate protection, help-desk paging/filtering/updates, XLSX and recording downloads, mobile navigation and JavaScript errors. Do not run it against a live service: it requires the visible demo banner.
+`CRS_BASE_URL` overrides local port 5174; `CHROMIUM_PATH` selects an installed browser. The script requires the test-host response header before performing writes. It checks cards/popups, validation, network-failure recovery, duplicate submission, independent downloads, keyboard/cancel, help-desk changes, Excel export and mobile navigation. CI runs Release tests and then this test-only host/browser walkthrough.
 
-`.github/workflows/dotnet.yml` restores locked packages, builds/tests Release, starts a fresh demo server and runs the browser walkthrough. CI publication is not part of this change. Tests cover the migration's known success/failure branches, not a guarantee against every possible production failure; see `docs/testing.md` for the test map.
+## Logging and validation
+
+Serilog writes daily files under `C:\CallRatingSystem\Logs` on Windows or `Logs` below the Web content root on Linux. Seven-day retention runs on file open/roll; files also roll at 100 MB. The application needs folder write permission. Request monitoring is in `Middleware/ControllerLoggingMiddleware.cs`; function-level logging is in Core functions. Controller log messages omit raw paths, queries, headers and request bodies. No log cleanup runs while the process is stopped.
+
+Tests use FakeItEasy for API/notification dependencies and SQLite **only in tests** to exercise actual EF queries, inserts, updates, null mapping and transactions. SQL Server service connectivity, live API, SMTP and future authentication setup remain for your configuration. The unused legacy task/patient controls are outside the active call-rating workflow. See `docs/testing.md` for coverage. Existing legacy configuration/history is not copied into the new projects.

@@ -18,7 +18,7 @@
         <div class="Flex_FloatTable">
             <div><div class="call-heading">@call.CallDateTime?.ToString("yyyy-MM-dd HH:mm")</div><div>@call.CallerFullName @call.CallerNumber</div></div>
             <div class="card-actions">
-            @if ((User.IsInRole("PSP") || User.IsInRole("IT") || User.IsInRole("Admin")) && !string.IsNullOrWhiteSpace(call.RecordingKey))
+            @if (!string.IsNullOrWhiteSpace(call.RecordingKey))
             { <a class="hw-btn secondary-button" asp-action="Recording" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Recording</a> }
             </div>
         </div>

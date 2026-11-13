@@ -1,10 +1,5 @@
 namespace CRS.Core.Models;
 
-public interface ICallApi
-{
-    Task<IReadOnlyList<CallInfo>> GetCallsAsync(string extension, DateOnly date, CancellationToken cancellationToken);
-    Task<string?> GetRecordingAsync(string key, CancellationToken cancellationToken);
-}
 public interface IRatingRepository
 {
     Task<UserProfile?> GetUserAsync(Guid userId, CancellationToken cancellationToken);

@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Text.Encodings.Web;
 using CRS.Core.Models;
-using Microsoft.Extensions.Logging;
+using Serilog;
 using Microsoft.Extensions.Options;
 
 namespace CRS.Core.Notifications;
@@ -34,7 +34,7 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
         await client.SendMailAsync(mail, ct);
     }
 }
-public sealed class SmtpRatingNotifier(IEmailSender sender, IOptions<SmtpOptions> options, ILogger<SmtpRatingNotifier> logger) : IRatingNotifier
+public sealed class SmtpRatingNotifier(IEmailSender sender, IOptions<SmtpOptions> options) : IRatingNotifier
 {
     public async Task NotifyAsync(CallRating rating, bool updated, CancellationToken ct)
     {
@@ -49,6 +49,6 @@ public sealed class SmtpRatingNotifier(IEmailSender sender, IOptions<SmtpOptions
         await sender.SendAsync(new(options.Value.HelpDesk, updated ? "Call rating status update" : "New call rating", html), ct);
         if (updated && rating.StatusId == 2 && !string.IsNullOrWhiteSpace(rating.Email))
             await sender.SendAsync(new(rating.Email, "Call rating feedback", html), ct);
-        logger.LogInformation("Rating notification delivery completed; update {IsUpdate}", updated);
+        Log.Information("Rating notification delivery completed; update {IsUpdate}", updated);
     }
 }

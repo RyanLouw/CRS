@@ -1,25 +1,27 @@
 using CRS.Core.Models;
-using CRS.Security;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CRS.Controllers;
 
-[Authorize]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class CallsController(ICallManager manager, TimeProvider clock) : Controller
+public sealed class CallListController(ICallManager manager, TimeProvider clock, IConfiguration configuration) : Controller
 {
+    // Authentication is intentionally left for the owner. Replace this configuration lookup
+    // with the signed-in directory user ID when wiring authentication.
+    private Guid CurrentUserId => Guid.TryParse(configuration["CurrentUser:Id"], out var id) && id != Guid.Empty
+        ? id : throw new WorkflowException("Configure CurrentUser:Id until sign-in is connected.");
+
     public async Task<IActionResult> Index(DateOnly? date, CancellationToken ct)
     {
         if (!ModelState.IsValid) throw new WorkflowException("Choose a valid call date.");
-        return View(await manager.GetCallsAsync(UserContext.UserId(User), date ?? DateOnly.FromDateTime(clock.GetLocalNow().DateTime), ct));
+        return View(await manager.GetCallsAsync(CurrentUserId, date ?? DateOnly.FromDateTime(clock.GetLocalNow().DateTime), ct));
     }
 
     private bool IsModalRequest => Request.Headers["X-Rating-Modal"] == "true";
 
     public async Task<IActionResult> Rate(string callId, DateOnly date, CancellationToken ct)
     {
-        var page = await manager.GetRatingPageAsync(UserContext.UserId(User), callId, date, ct);
+        var page = await manager.GetRatingPageAsync(CurrentUserId, callId, date, ct);
         return IsModalRequest ? PartialView("_RatingForm", page) : View(page);
     }
 
@@ -31,7 +33,7 @@ public sealed class CallsController(ICallManager manager, TimeProvider clock) : 
             if (ModelState.IsValid)
             {
                 // Use server-observed addresses; do not trust arbitrary X-Forwarded-For headers.
-                var result = await manager.SaveAsync(UserContext.UserId(User), input,
+                var result = await manager.SaveAsync(CurrentUserId, input,
                     HttpContext.Connection.RemoteIpAddress?.ToString(), HttpContext.Connection.LocalIpAddress?.ToString(), ct);
                 TempData[result.Saved && result.NotificationSent ? "Success" : "Warning"] = result.Message;
                 if (IsModalRequest) return Json(new { saved = result.Saved, notificationSent = result.NotificationSent });
@@ -39,7 +41,7 @@ public sealed class CallsController(ICallManager manager, TimeProvider clock) : 
             }
         }
         catch (WorkflowException ex) { ModelState.AddModelError("", ex.Message); }
-        var page = await manager.GetRatingPageAsync(UserContext.UserId(User), input.CallId, input.Date, ct);
+        var page = await manager.GetRatingPageAsync(CurrentUserId, input.CallId, input.Date, ct);
         if (IsModalRequest)
         {
             Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
@@ -47,7 +49,6 @@ public sealed class CallsController(ICallManager manager, TimeProvider clock) : 
         }
         return View(page with { Input = input });
     }
-    [Authorize(Policy = "Recordings")]
     public async Task<IActionResult> Recording(string callId, DateOnly date, CancellationToken ct) =>
-        Redirect(await manager.GetRecordingAsync(UserContext.UserId(User), callId, date, ct));
+        Redirect(await manager.GetRecordingAsync(CurrentUserId, callId, date, ct));
 }

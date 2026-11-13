@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using CRS.Core.Managers;
+using CRS.Core.Data;
 using CRS.Core.Models;
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,7 +11,7 @@ namespace CRS.Tests.Managers;
 public sealed class AdminManagerTests
 {
     private readonly IRatingRepository repo = A.Fake<IRatingRepository>();
-    private readonly ICallApi api = A.Fake<ICallApi>();
+    private readonly CallApiDataAccess api = A.Fake<CallApiDataAccess>(options => options.WithArgumentsForConstructor(new object[] { new HttpClient() }));
     private readonly IRatingNotifier notifier = A.Fake<IRatingNotifier>();
     private readonly AdminManager manager;
     private readonly CallRating rating = new() { Id = 40, RecordingKey = "saved-recording", StatusId = 1, DisplayName = "=HYPERLINK(\"bad\")" };
@@ -21,7 +22,7 @@ public sealed class AdminManagerTests
         A.CallTo(() => repo.FindAsync(A<long>._, A<CancellationToken>._)).Returns(Task.FromResult<CallRating?>(null));
         A.CallTo(() => repo.FindAsync(rating.Id, A<CancellationToken>._)).Returns(rating);
         A.CallTo(() => repo.UpdateAsync(A<long>._, A<Guid>._, A<DateTime>._, A<UpdateInput>._, A<CancellationToken>._)).Returns(true);
-        manager = new(repo, api, notifier, TimeProvider.System, NullLogger<AdminManager>.Instance);
+        manager = new(repo, api, notifier, TimeProvider.System);
     }
     private UpdateInput Input() => new() { Id = rating.Id, StatusId = 2, ReasonId = 1, Note = "Resolved" };
     [Theory] [InlineData(-10)] [InlineData(0)] [InlineData(1)] [InlineData(100)]

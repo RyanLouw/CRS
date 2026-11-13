@@ -1,17 +1,14 @@
-# Migration validation map
+# Test coverage
 
-Run `dotnet test CRS.slnx --configuration Release`. Tests isolate dependencies with FakeItEasy and HTTP handlers; no real database, email, caller recordings, or credentials are needed.
+`dotnet test CRS.slnx --configuration Release` runs:
 
-| Area | Tested cases |
-| --- | --- |
-| Call manager | Own extension/date filtering, empty calls, missing user/extension, missing identity, future/invalid dates, forged call IDs, valid/inactive problems/pharmacies, duplicate problem selection, required Other details, length limits, trusted save fields, duplicates, API/database/email failures, cancellation, recording ownership/missing recordings |
-| Help-desk manager | Empty/boundary pages, gaps in IDs, deterministic sort, status filters, missing ratings, invalid status/reason/notes, updates, concurrent deletion, failed database/email, stored recording key, valid/empty XLSX export, formula-like user input |
-| API client | Exact request URL/method/body/bearer contract, empty/null response, parsing, malformed/incomplete JSON, HTTP 400/401/403/404/429/500/503, connection failure, timeout vs caller cancellation, missing token, filename escaping, allowed/unsafe/missing recording URLs |
-| SQL adapter | Correct database/procedure selection, parameterized GUID/filter/ID/value binding, null/missing/aliased fields, duplicate/update result interpretation, transactional locking contract, missing configuration and propagated failures. SQL Server execution itself needs a live development database |
-| Notifications | Initial/update/closure recipients, absent user email, HTML encoding, SMTP errors, absent recipient/configuration. No mail is sent by tests |
-| Identity/demo | Supported directory ID claims, missing/malformed IDs, model validation, concurrent duplicate requests, demo isolation, demo rejection outside Development |
-| HTTP integration | Anonymous challenges, exact-role restrictions, CSRF on sign-in/rating, operator save/duplicate/validation, popup fragment/422/JSON save responses, admin filtering/paging/update/export, PSP WAV download, not-found/bad-input responses, sanitized dependency/unexpected errors, sign-out |
-| Logging | Folder override/default, relative/occupied folder failure, actual log output, actual old/recent file retention, request-query/path privacy |
-| Browser | Real Chromium operator/admin walkthrough, card popup/keyboard/cancel, independent download, loading/save network failures, form validation inside popup, save/duplicate, paging/filter/update, Excel/WAV downloads, legacy theme/mobile navigation, no JavaScript errors |
+- Call manager validation, ownership/date checks, missing users/extensions/calls, input constraints, duplicate saves, API/database/email failures, cancellation and recording resolution.
+- Help-desk paging/filtering, missing records, validation, persisted update orchestration, notification failure and spreadsheet generation/formula-like text.
+- `CallApiDataAccess` URL/method/body contract, no built-in authentication, JSON parsing, HTTP errors, connection failures, timeout/cancellation and recording URLs.
+- Real EF Core queries and SaveChanges against test-only SQLite databases: active lookups, directory reads, insert/update/audit fields, duplicate detection, nullable legacy columns, filters, untrusted text, failure translation and cancellation. SQL Server-specific transaction/concurrency behaviour still needs live database validation.
+- Email recipients, closure feedback, HTML encoding and delivery/configuration errors.
+- Exactly two application controllers, call-card/popup fragments, validation, antiforgery, persistence orchestration, recording downloads, admin updates/export and sanitized error responses.
+- Middleware monitoring only controller actions (not static files/unmatched requests), success/error events, and omission of query data. Serilog file output, folder errors and actual seven-day retention.
+- The test-only data fixtures remain outside Core/Web. The optional test executable hosts fake dependencies for browser checks; production has no demo switch.
 
-Required live follow-up, owned by deployment configuration: SQL schema/permissions and directory/lookup data, API token acquisition and service responses, SMTP delivery, Entra tenant/roles/callbacks, and Windows log-folder write access. These were not run and must not be inferred from mocked tests. No automated test can cover every possible failure.
+Authentication/token/role tests were removed with that explicitly deferred functionality, not marked as skipped. The owner will wire and test authentication later. No test suite guarantees every possible failure. Live SQL Server/API/SMTP and Windows file-permission checks are not claimed by mocked/SQLite tests.

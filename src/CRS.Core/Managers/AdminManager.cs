@@ -1,11 +1,12 @@
 using ClosedXML.Excel;
 using CRS.Core.Models;
-using Microsoft.Extensions.Logging;
+using Serilog;
+using CRS.Core.Data;
 
 namespace CRS.Core.Managers;
 
-public sealed class AdminManager(IRatingRepository repository, ICallApi api, IRatingNotifier notifier,
-    TimeProvider clock, ILogger<AdminManager> logger) : IAdminManager
+public sealed class AdminManager(IRatingRepository repository, CallApiDataAccess api, IRatingNotifier notifier,
+    TimeProvider clock) : IAdminManager
 {
     public async Task<AdminPage> GetPageAsync(int page, long? statusId, CancellationToken ct)
     {
@@ -42,7 +43,7 @@ public sealed class AdminManager(IRatingRepository repository, ICallApi api, IRa
         var now = clock.GetLocalNow().DateTime;
         if (!await repository.UpdateAsync(input.Id, userId, now, input, ct))
             throw new MissingRecordException("The rating no longer exists.");
-        logger.LogInformation("Help-desk rating updated; rating {RatingId}", input.Id);
+        Log.Information("Help-desk rating updated; rating {RatingId}", input.Id);
         var updated = page.Rating with { StatusId = status.Id, Status = status.Name, ReasonId = reason.Id,
             Reason = reason.Name, ITNote = input.Note?.Trim(), UpdatedAt = now, UpdatedBy = userId };
         try
@@ -52,7 +53,7 @@ public sealed class AdminManager(IRatingRepository repository, ICallApi api, IRa
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            logger.LogWarning("Help-desk update saved but notification failed with {ErrorType}", ex.GetType().Name);
+            Log.Warning("Help-desk update saved but notification failed with {ErrorType}", ex.GetType().Name);
             return new(true, false, "Update saved, but an email notification failed. Contact IT.");
         }
     }
@@ -62,7 +63,7 @@ public sealed class AdminManager(IRatingRepository repository, ICallApi api, IRa
         if (string.IsNullOrWhiteSpace(rating.RecordingKey)) throw new MissingRecordException("No recording is available.");
         var url = await api.GetRecordingAsync(rating.RecordingKey, ct)
             ?? throw new MissingRecordException("The recording is no longer available.");
-        logger.LogInformation("Help-desk recording lookup completed; rating {RatingId}", id);
+        Log.Information("Help-desk recording lookup completed; rating {RatingId}", id);
         return url;
     }
     public async Task<byte[]> ExportAsync(long? statusId, CancellationToken ct)
@@ -90,7 +91,7 @@ public sealed class AdminManager(IRatingRepository repository, ICallApi api, IRa
         sheet.Columns().AdjustToContents(1, Math.Min(row, 100));
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
-        logger.LogInformation("Call-rating report generated; row count {RowCount}", rows.Count);
+        Log.Information("Call-rating report generated; row count {RowCount}", rows.Count);
         return stream.ToArray();
     }
 }

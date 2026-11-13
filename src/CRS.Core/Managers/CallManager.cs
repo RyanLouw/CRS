@@ -1,10 +1,11 @@
 using CRS.Core.Models;
-using Microsoft.Extensions.Logging;
+using Serilog;
+using CRS.Core.Data;
 
 namespace CRS.Core.Managers;
 
-public sealed class CallManager(IRatingRepository repository, ICallApi api, IRatingNotifier notifier,
-    TimeProvider clock, ILogger<CallManager> logger) : ICallManager
+public sealed class CallManager(IRatingRepository repository, CallApiDataAccess api, IRatingNotifier notifier,
+    TimeProvider clock) : ICallManager
 {
     public async Task<CallListPage> GetCallsAsync(Guid userId, DateOnly date, CancellationToken ct)
     {
@@ -20,7 +21,7 @@ public sealed class CallManager(IRatingRepository repository, ICallApi api, IRat
         var owned = calls.Where(c => c.Extension == user.Extension && c.CallDateTime.HasValue &&
             DateOnly.FromDateTime(c.CallDateTime.Value) == date).ToArray();
         var lookups = await repository.GetLookupsAsync(ct);
-        logger.LogInformation("Call list loaded; count {CallCount}", owned.Length);
+        Log.Information("Call list loaded; count {CallCount}", owned.Length);
         return new(user, date, owned, lookups);
     }
 
@@ -62,7 +63,7 @@ public sealed class CallManager(IRatingRepository repository, ICallApi api, IRat
         };
         if (!await repository.AddAsync(rating, ct))
             return new(false, false, "This call has already been reported. No duplicate was saved.");
-        logger.LogInformation("Call rating saved");
+        Log.Information("Call rating saved");
         return await NotifyAsync(rating, ct);
     }
 
@@ -75,7 +76,7 @@ public sealed class CallManager(IRatingRepository repository, ICallApi api, IRat
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            logger.LogWarning("Rating saved but notification failed with {ErrorType}", ex.GetType().Name);
+            Log.Warning("Rating saved but notification failed with {ErrorType}", ex.GetType().Name);
             return new(true, false, "Call rating saved, but the email notification failed. Do not submit it again; contact IT.");
         }
     }
@@ -86,7 +87,7 @@ public sealed class CallManager(IRatingRepository repository, ICallApi api, IRat
         if (string.IsNullOrWhiteSpace(call.RecordingKey)) throw new MissingRecordException("No recording is available for this call.");
         var url = await api.GetRecordingAsync(call.RecordingKey, ct)
             ?? throw new MissingRecordException("The recording is no longer available.");
-        logger.LogInformation("Operator recording lookup completed");
+        Log.Information("Operator recording lookup completed");
         return url;
     }
 }

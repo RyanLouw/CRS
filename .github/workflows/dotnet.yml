@@ -26,7 +26,7 @@ jobs:
       - name: Browser workflow
         shell: bash
         run: |
-          dotnet run --project src/CRS.Web --configuration Release --no-build --no-launch-profile --environment Development --urls http://127.0.0.1:5174 > /tmp/crs-web.log 2>&1 &
+          dotnet run --project tests/CRS.Tests --configuration Release --no-build --no-launch-profile -- 5174 > /tmp/crs-web.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do

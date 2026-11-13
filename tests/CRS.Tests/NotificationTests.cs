@@ -11,7 +11,7 @@ public sealed class NotificationTests
 {
     private readonly IEmailSender sender = A.Fake<IEmailSender>();
     private readonly SmtpRatingNotifier notifier;
-    public NotificationTests() => notifier = new(sender, Options.Create(new SmtpOptions { HelpDesk = "helpdesk@example.invalid" }), NullLogger<SmtpRatingNotifier>.Instance);
+    public NotificationTests() => notifier = new(sender, Options.Create(new SmtpOptions { HelpDesk = "helpdesk@example.invalid" }));
     [Theory] [InlineData(false, 1, 1)] [InlineData(true, 1, 1)] [InlineData(true, 2, 2)]
     public async Task SendsHelpDeskAndOnlySendsUserFeedbackOnClosure(bool updated, long status, int expected)
     {
@@ -37,7 +37,7 @@ public sealed class NotificationTests
     }
     [Fact] public async Task MissingHelpDeskRecipientDoesNotAttemptDelivery()
     {
-        var missing = new SmtpRatingNotifier(sender, Options.Create(new SmtpOptions()), NullLogger<SmtpRatingNotifier>.Instance);
+        var missing = new SmtpRatingNotifier(sender, Options.Create(new SmtpOptions()));
         await Assert.ThrowsAsync<DependencyException>(() => missing.NotifyAsync(new(), false, default));
         A.CallTo(() => sender.SendAsync(A<NotificationMessage>._, A<CancellationToken>._)).MustNotHaveHappened();
     }

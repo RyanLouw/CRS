@@ -1,14 +1,16 @@
 using CRS.Core.Models;
-using CRS.Security;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CRS.Controllers;
 
-[Authorize(Policy = "HelpDesk")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class AdminController(IAdminManager manager) : Controller
+public sealed class AdminController(IAdminManager manager, IConfiguration configuration) : Controller
 {
+    // Authentication is intentionally left for the owner. Replace this configuration lookup
+    // with the signed-in directory user ID when wiring authentication.
+    private Guid CurrentUserId => Guid.TryParse(configuration["CurrentUser:Id"], out var id) && id != Guid.Empty
+        ? id : throw new WorkflowException("Configure CurrentUser:Id until sign-in is connected.");
+
     public async Task<IActionResult> Index(int page = 1, long? statusId = null, CancellationToken ct = default)
     {
         if (!ModelState.IsValid) throw new WorkflowException("Choose a valid status and page number.");
@@ -22,7 +24,7 @@ public sealed class AdminController(IAdminManager manager) : Controller
         {
             if (ModelState.IsValid)
             {
-                var result = await manager.UpdateAsync(UserContext.UserId(User), input, ct);
+                var result = await manager.UpdateAsync(CurrentUserId, input, ct);
                 TempData[result.NotificationSent ? "Success" : "Warning"] = result.Message;
                 return RedirectToAction(nameof(Index));
             }

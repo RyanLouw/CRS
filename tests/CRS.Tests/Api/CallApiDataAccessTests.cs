@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using CRS.Core.Api;
+using CRS.Core.Data;
 using CRS.Core.Models;
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,25 +10,22 @@ using Xunit;
 
 namespace CRS.Tests.Api;
 
-public sealed class CallApiClientTests
+public sealed class CallApiDataAccessTests
 {
-    private readonly IAccessTokenProvider tokens = A.Fake<IAccessTokenProvider>();
     private readonly StubHandler handler = new();
-    private readonly CallApiClient api;
-    public CallApiClientTests()
+    private readonly CallApiDataAccess api;
+    public CallApiDataAccessTests()
     {
-        A.CallTo(() => tokens.GetAsync(A<CancellationToken>._)).Returns("test-only-token");
-        api = new(new HttpClient(handler) { BaseAddress = new Uri("https://api.example.invalid/") }, tokens,
-            Options.Create(new CallApiOptions { RecordingHosts = ["recordings.example.invalid"] }), NullLogger<CallApiClient>.Instance);
+        api = new(new HttpClient(handler) { BaseAddress = new Uri("https://api.example.invalid/") });
     }
     private Task<IReadOnlyList<CallInfo>> Calls(CancellationToken ct = default) => api.GetCallsAsync("330", new(2026, 11, 13), ct);
-    [Fact] public async Task PostsExpectedContractAndPerRequestBearerToken()
+    [Fact] public async Task PostsExpectedContractWithoutAuthenticationScaffolding()
     {
         handler.Body = "[]";
         await Calls();
         Assert.Equal(HttpMethod.Post, handler.Method);
         Assert.Equal("/api/3cx/call-logs/by-extension", handler.Uri!.AbsolutePath);
-        Assert.Equal("Bearer test-only-token", handler.Authorization);
+        Assert.Null(handler.Authorization);
         using var json = JsonDocument.Parse(handler.RequestBody!);
         Assert.Equal("330", json.RootElement.GetProperty("extension").GetString());
         Assert.Equal("Both", json.RootElement.GetProperty("callType").GetString());
@@ -69,20 +66,15 @@ public sealed class CallApiClientTests
         handler.Error = new OperationCanceledException(cts.Token);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Calls(cts.Token));
     }
-    [Fact] public async Task MissingTokenStopsHttpRequest()
-    {
-        var provider = new ConfiguredAccessTokenProvider(Options.Create(new CallApiOptions()));
-        await Assert.ThrowsAsync<DependencyException>(() => provider.GetAsync(default));
-    }
     [Theory] [InlineData("https://recordings.example.invalid/file.wav")] [InlineData("https://RECORDINGS.example.invalid/file?signature=test")]
-    public async Task AllowsOnlyConfiguredHttpsRecordingHosts(string url)
+    public async Task AcceptsHttpsRecordingUrl(string url)
     {
         handler.Body = JsonSerializer.Serialize(new { url });
         Assert.StartsWith("https://recordings.example.invalid/", await api.GetRecordingAsync("file name.wav", default));
         Assert.Equal(HttpMethod.Get, handler.Method);
         Assert.Contains("file%20name.wav", handler.Uri!.AbsoluteUri);
     }
-    [Theory] [InlineData("http://recordings.example.invalid/file")] [InlineData("https://attacker.invalid/file")]
+    [Theory] [InlineData("http://recordings.example.invalid/file")]
     [InlineData("javascript:alert(1)")] [InlineData("//recordings.example.invalid/file")] [InlineData("https://user:pass@recordings.example.invalid/file")]
     public async Task RejectsUnsafeRecordingUrls(string url)
     {

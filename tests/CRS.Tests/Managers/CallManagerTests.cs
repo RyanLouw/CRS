@@ -1,4 +1,5 @@
 using CRS.Core.Managers;
+using CRS.Core.Data;
 using CRS.Core.Models;
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -9,7 +10,7 @@ namespace CRS.Tests.Managers;
 public sealed class CallManagerTests
 {
     private readonly IRatingRepository repo = A.Fake<IRatingRepository>();
-    private readonly ICallApi api = A.Fake<ICallApi>();
+    private readonly CallApiDataAccess api = A.Fake<CallApiDataAccess>(options => options.WithArgumentsForConstructor(new object[] { new HttpClient() }));
     private readonly IRatingNotifier notifier = A.Fake<IRatingNotifier>();
     private readonly TimeProvider clock = A.Fake<TimeProvider>();
     private readonly Guid userId = Guid.NewGuid();
@@ -25,7 +26,7 @@ public sealed class CallManagerTests
         A.CallTo(() => repo.GetLookupsAsync(A<CancellationToken>._)).Returns(lookups);
         A.CallTo(() => api.GetCallsAsync("330", date, A<CancellationToken>._)).Returns(new[] { call });
         A.CallTo(() => repo.AddAsync(A<CallRating>._, A<CancellationToken>._)).Returns(true);
-        manager = new(repo, api, notifier, clock, NullLogger<CallManager>.Instance);
+        manager = new(repo, api, notifier, clock);
     }
     private RatingInput Input() => new() { CallId = call.CallID, Date = date, PharmacyId = 1, ProblemIds = [1] };
     [Fact] public async Task LoadsOwnCallsAndLookupData()
