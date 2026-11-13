@@ -1,8 +1,5 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
-}
-
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+@{ ViewData["Title"] = "Call Rating System"; }
+<div class="py-5"><h1>Welcome to Call Rating System</h1><p class="lead">Review your calls, report audio problems, and track help-desk feedback.</p>
+<a class="btn btn-primary" asp-controller="Calls" asp-action="Index">My calls</a>
+@if (User.IsInRole("Admin") || User.IsInRole("IT")) { <a class="btn btn-outline-primary" asp-controller="Admin" asp-action="Index">Help desk</a> }
 </div>

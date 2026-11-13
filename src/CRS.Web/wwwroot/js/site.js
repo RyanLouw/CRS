@@ -1,4 +1,6 @@
-﻿// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
-
-// Write your JavaScript code.
+const menuToggle = document.querySelector('.menu-toggle');
+menuToggle?.addEventListener('click', () => {
+    const menu = document.getElementById('navigation-links');
+    const opened = menu.classList.toggle('is-open');
+    menuToggle.setAttribute('aria-expanded', String(opened));
+});

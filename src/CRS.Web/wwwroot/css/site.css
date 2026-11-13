@@ -1,31 +1,68 @@
-html {
-  font-size: 14px;
+/* MVC integration of the existing HW theme. Original theme assets live in /legacy. */
+html { font-size: 62.5%; }
+body.crs-app { background: #E9ECEF; color: #343a40; font: 1.6rem/1.6 Arial, Helvetica, sans-serif; }
+.crs-app form { min-height: 0; height: auto; width: auto; display: block; background: transparent; margin: 0; }
+.crs-app h1 { font-size: 3.2rem; color: var(--secondary-100); margin-bottom: 1rem; }
+.crs-app h2 { font-size: 2rem; }
+.crs-app p { margin-bottom: 1rem; }
+.crs-app label, .crs-app span { font-size: inherit; }
+.crs-app .nav_bar { height: 10rem; padding: 1rem 2rem; gap: 2rem; }
+.crs-app .HW_Logo { width: 22rem; flex-shrink: 0; margin: 0; }
+.crs-app .HW_Logo img { max-height: 7rem; object-fit: contain; }
+.crs-app .System_name { margin: 0 auto 0 0; }
+.crs-app .System_name a { font-size: 3.4rem; text-decoration: none; white-space: nowrap; }
+.crs-app .nav_bar--items { display: flex; position: static; padding: 0; height: auto; width: auto; background: transparent; gap: 1rem; }
+.crs-app .navigation-links { flex-shrink: 0; }
+.crs-app button.menu-toggle { display: none; }
+.crs-app .app-content { padding: 12rem 3rem 3rem; min-height: calc(100vh - 6rem); }
+.crs-app .app-footer { padding: 2rem 3rem; color: #495057; font-size: 1.4rem; }
+.crs-app .demo-notice { margin-bottom: 2rem; }
+.crs-app .hw-btn, .crs-app .btn { display: inline-block; min-width: 0; max-width: none; margin: 0; padding: .7rem 1.8rem; font-size: 1.6rem; font-weight: 600; text-decoration: none; border: 2px solid var(--primary); border-radius: 1rem; color: white; background: var(--primary); line-height: 1.6; cursor: pointer; }
+.crs-app .hw-btn:hover, .crs-app .btn:hover { background: #db6f31; color: white; }
+.crs-app .secondary-button, .crs-app .btn-outline-secondary, .crs-app .btn-outline-primary { background: var(--secondary-100); border-color: var(--secondary-100); }
+.crs-app a:focus-visible, .crs-app button:focus-visible, .crs-app input:focus-visible, .crs-app select:focus-visible, .crs-app textarea:focus-visible { outline: 3px solid var(--secondary-100); outline-offset: 3px; }
+.crs-app .Filterwrapper { position: static; height: auto; width: 100%; padding: 1rem 0 2rem; display: flex; justify-content: space-between; align-items: end; gap: 2rem; flex-wrap: wrap; }
+.crs-app .filter-fields { display: flex; align-items: end; flex-wrap: wrap; gap: 1.2rem; }
+.crs-app .form-control, .crs-app .form-select { font-size: 1.6rem; padding: .8rem 1.2rem; border-radius: 1rem; border: 1px solid #adb5bd; }
+.crs-app .form-label { font-weight: 600; margin-bottom: .6rem; }
+.crs-app .mainwrapper { padding: 0; margin: 0; }
+.crs-app .Float__Table { min-height: 0; max-height: none; height: auto; padding: 2rem 2.4rem; margin: 0 0 2rem; overflow: visible; }
+.crs-app .Float__Table::before, .crs-app .Float__Table::after { display: none; }
+.crs-app .Flex_FloatTable { display: flex; flex-wrap: wrap; gap: 2rem; justify-content: space-between; align-items: center; }
+.crs-app .Flex_FloatTable > div { width: auto; max-width: none; margin: 0; text-align: left; }
+.crs-app .call-heading { color: var(--secondary-100); font-weight: 600; font-size: 1.8rem; }
+.crs-app .call-metadata { color: #495057; display: flex; flex-wrap: wrap; gap: .8rem 2.5rem; margin-top: 1.3rem; }
+.crs-app .card-actions { display: flex; flex-wrap: wrap; gap: 1rem; }
+.crs-app .rating-detail { padding-top: 1.5rem; margin-top: 1.5rem; border-top: 1px solid #dee2e6; overflow-wrap: anywhere; }
+.crs-app .setStatus { background: var(--secondary-100); color: white; border-radius: .7rem; padding: .4rem 1rem; white-space: nowrap; }
+.crs-app .workflow-panel { background: white; max-width: 85rem; margin: 0 auto; padding: 2.5rem; border-radius: 1rem; box-shadow: 0 3px 6px #00000029; }
+.crs-app .workflow-panel > h1 { border-bottom: 2px solid var(--secondary-100); padding-bottom: 1.5rem; }
+.crs-app .workflow-form { max-width: none; }
+.crs-app .workflow-form .mb-3 { margin-bottom: 1.8rem !important; }
+.crs-app .workflow-form > button { background: #2d7845; border-color: #2d7845; }
+.crs-app .form-check { margin: .5rem 0; padding-left: 2.5rem; }
+.crs-app .form-check-input { width: 1.6rem; height: 1.6rem; margin-left: -2.5rem; margin-top: .5rem; }
+.crs-app .form-check-input:checked { background-color: var(--secondary-100); border-color: var(--secondary-100); }
+.crs-app .fs-5 { font-size: 1.8rem !important; }
+.crs-app .text-muted { color: #495057 !important; }
+.crs-app .lead { font-size: 1.9rem; }
+.crs-app .demo-accounts { display: flex; gap: 1rem; flex-wrap: wrap; }
+@media (max-width: 1100px) {
+  .crs-app .HW_Logo { width: 16rem; }
+  .crs-app .System_name a { font-size: 2.6rem; }
+  .crs-app .nav_bar { gap: 1.2rem; padding: 1rem 1.5rem; }
+  .crs-app .nav_bar--items .hw-btn { padding: .6rem 1rem; }
 }
-
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
-
-body {
-  margin-bottom: 60px;
-}
-
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
-}
-
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+@media (max-width: 768px) {
+  .crs-app .nav_bar { height: 9rem; min-height: 9rem; }
+  .crs-app .HW_Logo { width: 12rem; }
+  .crs-app .System_name a { white-space: normal; font-size: 2.2rem; }
+  .crs-app button.menu-toggle { display: block; }
+  .crs-app .navigation-links { display: none; position: absolute; top: 9rem; left: 0; width: 100%; padding: 1.5rem; background: #F8F9FA; border-bottom: 2px solid var(--secondary-100); }
+  .crs-app .navigation-links.is-open { display: block; }
+  .crs-app .nav_bar--items { flex-wrap: wrap; justify-content: flex-start; }
+  .crs-app .app-content { padding: 11rem 1.5rem 2rem; }
+  .crs-app .Float__Table { padding: 1.8rem; }
+  .crs-app .workflow-panel { padding: 1.8rem; }
+  .crs-app h1 { font-size: 2.6rem; }
 }

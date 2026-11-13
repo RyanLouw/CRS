@@ -1,0 +1,26 @@
+@model CRS.Core.Models.CallListPage
+@{ ViewData["Title"] = "My calls"; }
+<div class="Filterwrapper">
+    <div><h1>My calls</h1><p class="text-muted">@Model.User.DisplayName · Extension @Model.User.Extension</p></div>
+    <form method="get"><div class="filter-fields">
+        <div><label for="date" class="form-label">Call date</label><input id="date" name="date" type="date" class="form-control" value="@Model.Date.ToString("yyyy-MM-dd")" required /></div>
+        <button class="hw-btn">Refresh calls</button>
+    </div></form>
+</div>
+<div class="Call_RatingTable mainwrapper">
+@if (Model.Calls.Count == 0)
+{ <div class="alert alert-info">No calls were found for this date.</div> }
+@foreach (var call in Model.Calls)
+{
+    <article class="Float__Table call-card">
+        <div class="Flex_FloatTable">
+            <div><div class="call-heading">@call.CallDateTime?.ToString("yyyy-MM-dd HH:mm")</div><div>@call.CallerFullName @call.CallerNumber</div></div>
+            <div class="card-actions"><a class="hw-btn" asp-action="Rate" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Report problem</a>
+            @if ((User.IsInRole("PSP") || User.IsInRole("IT") || User.IsInRole("Admin")) && !string.IsNullOrWhiteSpace(call.RecordingKey))
+            { <a class="hw-btn secondary-button" asp-action="Recording" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Recording</a> }
+            </div>
+        </div>
+        <div class="call-metadata"><span>@call.Incoming</span><span>Duration: @call.DurationMinutes minutes</span><span>Answered: @(call.IsAnswered ? "Yes" : "No")</span></div>
+    </article>
+}
+</div>

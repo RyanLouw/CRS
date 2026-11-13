@@ -1,47 +1,39 @@
-﻿<!DOCTYPE html>
+@inject IConfiguration Configuration
+@inject IWebHostEnvironment HostEnvironment
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - CRS</title>
-    <script type="importmap"></script>
+    <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - Call Rating System</title>
+    <link rel="icon" type="image/png" href="~/images/hw-icon.png" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/legacy/main.css" asp-append-version="true" />
+    @if (ViewContext.RouteData.Values["controller"]?.ToString() == "Admin")
+    { <link rel="stylesheet" href="~/legacy/admin.css" asp-append-version="true" /> }
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/CRS.styles.css" asp-append-version="true" />
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">CRS</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
-
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - CRS - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
-    </footer>
+<body class="crs-app">
+    <header><nav class="nav_bar" aria-label="Main navigation">
+        <a asp-controller="Home" asp-action="Index" class="HW_Logo"><img src="~/images/hw-logo.png" alt="Health Window" /></a>
+        <div class="System_name"><a class="navbar-brand" asp-controller="Calls" asp-action="Index">Call Rating System</a></div>
+        <button type="button" class="menu-toggle hw-btn" aria-controls="navigation-links" aria-expanded="false">Menu</button>
+        <div class="navigation-links" id="navigation-links"><div class="nav_bar--items">
+            <a class="hw-btn secondary-button" asp-controller="Calls" asp-action="Index">My calls</a>
+            @if (User.IsInRole("IT") || User.IsInRole("Admin"))
+            { <a class="hw-btn secondary-button" asp-controller="Admin" asp-action="Index">Help desk</a> }
+            @if (User.Identity?.IsAuthenticated == true)
+            { <form asp-controller="Account" asp-action="Logout" method="post"><button class="hw-btn secondary-button">Sign out</button></form> }
+            else { <a class="hw-btn secondary-button" asp-controller="Account" asp-action="Login">Sign in</a> }
+        </div></div>
+    </nav></header>
+    <main class="container-fluid app-content" id="main-content">
+        @if (HostEnvironment.IsDevelopment() && Configuration.GetValue<bool>("Demo:Enabled"))
+        { <div class="alert alert-warning demo-notice" role="status"><strong>DEMO MODE</strong> — synthetic data, temporary changes, simulated emails.</div> }
+        @if (TempData["Success"] is string success) { <div class="alert alert-success" role="status">@success</div> }
+        @if (TempData["Warning"] is string warning) { <div class="alert alert-warning" role="status">@warning</div> }
+        @RenderBody()
+    </main>
+    <footer class="app-footer">Call Rating System · <a asp-controller="Home" asp-action="Privacy">Privacy</a></footer>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>

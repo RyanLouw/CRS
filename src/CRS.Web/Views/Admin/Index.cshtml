@@ -1,0 +1,27 @@
+@model CRS.Core.Models.AdminPage
+@{ ViewData["Title"] = "Help desk"; }
+<div class="Filterwrapper"><div><h1>Help desk</h1><p class="text-muted">Review call problems and update their status.</p></div>
+<a class="hw-btn secondary-button" asp-action="Export" asp-route-statusId="@Model.StatusId">Export Excel</a></div>
+<form method="get"><div class="filter-fields mb-4"><div><label for="statusId" class="form-label">Status</label><select name="statusId" id="statusId" class="form-select"><option value="">All statuses</option>
+    @foreach (var status in Model.Lookups.Statuses) { <option value="@status.Id" selected="@(status.Id == Model.StatusId)">@status.Name</option> }
+</select></div><button class="hw-btn">Apply filter</button></div></form>
+<div class="mainwrapper">
+@if (Model.Ratings.Count == 0) { <div class="alert alert-info">No ratings match this filter.</div> }
+@foreach (var rating in Model.Ratings)
+{
+    <article class="Float__Table">
+        <div class="Flex_FloatTable">
+            <div><div class="call-heading">@rating.DisplayName · @rating.Extension</div><div>@rating.CallDateTime?.ToString("yyyy-MM-dd HH:mm") · @rating.NumberPhoned</div></div>
+            <div class="card-actions"><span class="setStatus">@rating.Status</span><a class="hw-btn" asp-action="Edit" asp-route-id="@rating.Id">Review</a></div>
+        </div>
+        <div class="rating-detail"><strong>@rating.Problems</strong><p>@rating.OtherProblem</p>
+            <div class="call-metadata"><span>Pharmacy: @rating.Pharmacy</span><span>Captured: @rating.CaptureDate.ToString("yyyy-MM-dd HH:mm")</span><span>@rating.Reason</span></div>
+        </div>
+    </article>
+}
+</div>
+<nav aria-label="Rating pages" class="d-flex gap-3 align-items-center">
+    @if (Model.Page > 1) { <a class="hw-btn secondary-button" asp-action="Index" asp-route-page="@(Model.Page - 1)" asp-route-statusId="@Model.StatusId">Previous</a> }
+    <span>Page @Model.Page of @Model.PageCount</span>
+    @if (Model.Page < Model.PageCount) { <a class="hw-btn secondary-button" asp-action="Index" asp-route-page="@(Model.Page + 1)" asp-route-statusId="@Model.StatusId">Next</a> }
+</nav>

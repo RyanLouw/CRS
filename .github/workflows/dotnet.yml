@@ -1,0 +1,42 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+      - run: dotnet restore CRS.slnx --locked-mode
+      - run: dotnet build CRS.slnx --no-restore --configuration Release
+      - run: dotnet test CRS.slnx --no-build --configuration Release --logger trx --results-directory TestResults
+      - run: npm ci --prefix tests/browser
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests/browser
+      - name: Browser workflow
+        shell: bash
+        run: |
+          dotnet run --project src/CRS.Web --configuration Release --no-build --no-launch-profile --environment Development --urls http://127.0.0.1:5174 > /tmp/crs-web.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:5174/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:5174/ > /dev/null
+          npm test --prefix tests/browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults/*.trx

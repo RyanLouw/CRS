@@ -79,3 +79,6 @@ local.settings.json
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+# Browser smoke-test dependencies and artifacts
+**/node_modules/
+**/.artifacts/

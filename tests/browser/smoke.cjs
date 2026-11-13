@@ -1,0 +1,79 @@
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
+  const page = await browser.newPage({ acceptDownloads: true });
+  const failures = [];
+  page.on('pageerror', error => failures.push(error.message));
+  const baseUrl = process.env.CRS_BASE_URL || 'http://localhost:5174';
+  const passed = [];
+  try {
+    await page.goto(baseUrl + '/Account/Login');
+    await page.getByText('DEMO MODE', { exact: false }).waitFor();
+    await page.getByRole('button', { name: 'Demo operator', exact: true }).click();
+    await page.getByRole('heading', { name: 'My calls', exact: true }).waitFor();
+    assert.equal(await page.getByRole('link', { name: 'Recording', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), false, 'Desktop navigation should stay expanded');
+    passed.push('operator sign-in and calls; restricted recordings hidden');
+
+    await page.getByRole('link', { name: 'Report problem' }).first().click();
+    // Submit without choosing a problem: server-side validation must preserve the form.
+    await page.getByLabel('Pharmacy', { exact: true }).selectOption('1');
+    await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
+    await page.getByText('Select at least one problem.', { exact: true }).waitFor();
+    await page.getByLabel('Poor audio', { exact: true }).check();
+    await page.getByLabel('Other details', { exact: true }).fill('Browser smoke test');
+    await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
+    await page.getByText('Call rating saved and help desk notified.', { exact: true }).waitFor();
+    passed.push('rating validation and save');
+
+    await page.getByRole('link', { name: 'Report problem' }).first().click();
+    await page.getByLabel('Poor audio', { exact: true }).check();
+    await page.getByLabel('Pharmacy', { exact: true }).selectOption('1');
+    await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
+    await page.getByText('This call has already been reported. No duplicate was saved.', { exact: true }).waitFor();
+    passed.push('duplicate submission protection');
+
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await page.getByRole('button', { name: 'Demo administrator', exact: true }).click();
+    await page.getByRole('heading', { name: 'Help desk', exact: true }).waitFor();
+    await page.getByRole('link', { name: 'Next', exact: true }).click();
+    await page.getByText('Page 2 of 3', { exact: true }).waitFor();
+    await page.getByRole('link', { name: 'Previous', exact: true }).click();
+    await page.getByLabel('Status', { exact: true }).selectOption('1');
+    await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
+    await page.getByRole('link', { name: 'Review', exact: true }).first().click();
+    await page.getByLabel('Help-desk status', { exact: true }).selectOption('2');
+    await page.getByLabel('Help-desk reason', { exact: true }).selectOption('1');
+    await page.getByLabel('IT note', { exact: true }).fill('Browser confirmed resolution');
+    await page.getByRole('button', { name: 'Save update', exact: true }).click();
+    await page.getByText('Help-desk update saved and notifications sent.', { exact: true }).waitFor();
+    passed.push('help-desk paging, filtering, review and update');
+
+    const reportEvent = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Export Excel', exact: true }).click();
+    const report = await reportEvent;
+    assert.equal(report.suggestedFilename(), 'CallRatings.xlsx');
+    assert.ok((await fs.stat(await report.path())).size > 1000);
+    passed.push('Excel report download');
+
+    await page.getByRole('link', { name: 'Review', exact: true }).first().click();
+    const audioEvent = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Download recording', exact: true }).click();
+    const audio = await audioEvent;
+    const bytes = await fs.readFile(await audio.path());
+    assert.equal(bytes.subarray(0, 4).toString(), 'RIFF');
+    passed.push('recording download');
+    if (process.env.SCREENSHOT_PATH) await page.screenshot({ path: process.env.SCREENSHOT_PATH, fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(baseUrl + '/Calls');
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await page.getByRole('link', { name: 'Help desk', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'Mobile page must not overflow horizontally');
+    passed.push('mobile legacy theme and navigation');
+    assert.deepEqual(failures, [], 'Browser JavaScript errors');
+    console.log(JSON.stringify({ passed, javascriptErrors: failures }, null, 2));
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });
