@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/CRS.Core/CRS.Core.csproj" />
+  <Project Path="src/CRS.Web/CRS.Web.csproj" />
+  <Project Path="tests/CRS.Tests/CRS.Tests.csproj" />
+</Solution>
