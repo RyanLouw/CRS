@@ -1,7 +1,20 @@
 # Call Rating System — ASP.NET Core MVC
 
-The active call-rating workflow is migrated to .NET 10. Open **CRS.slnx** in a .NET 10-compatible IDE, such as Visual Studio 2026, or use the CLI. The old Framework 4.8 applications remain untouched as references.
+The active call-rating workflow is migrated to .NET 10. Open **CRS.slnx** in a .NET 10-compatible IDE, such as Visual Studio 2026, or use the CLI. The old Framework 4.8 application is a separate `CallRatingSystem` project in the same root solution. It is excluded from default solution builds because it requires Windows/Visual Studio WebApplication targets and its legacy dependencies. Enable its Build checkbox in Visual Studio Configuration Manager only when you intend to build it with those prerequisites installed.
 
+The repository has one solution and three application projects (plus tests):
+
+```text
+CRS.slnx
+CallRatingSystem/          # Existing Framework 4.8 application
+src/CRS.Web/               # New ASP.NET Core MVC application
+src/CRS.Core/              # Models, managers, API and database access
+tests/CRS.Tests/           # Tests of the new application
+```
+
+The old `CRS/CRS/CallRatingSystem` duplicate and nested solution files have been removed. Open the root `CRS.slnx`; there is no remaining combined `CRS.csproj`.
+
+- **CallRatingSystem**: original legacy project, included for reference and separate Windows builds.
 - **CRS.Core**: models, call/help-desk managers, SQL Server repository, calls API client, email notifications, Excel generation, and development demo adapters.
 - **CRS.Web**: controllers, Razor views, authentication/authorization, application composition and Serilog. Reuses the original HW logo, theme CSS, colours, rounded buttons and floating call/rating cards with responsive MVC layout adjustments.
 - **CRS.Tests**: xUnit + FakeItEasy unit tests and authenticated HTTP integration tests.
