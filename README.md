@@ -28,8 +28,8 @@ Demo mode is labelled on every screen, uses synthetic calls/ratings, simulates e
 
 ## Walk through the migrated features
 
-1. Sign in as demo operator. Select a date, refresh calls, and report a call problem.
-2. Choose problems and a pharmacy. “Other” requires details. Invalid choices are rejected server-side. Saving persists the rating before notifying help desk; notification failure explicitly reports that the save succeeded. Repeated submissions do not insert duplicates.
+1. Sign in as demo operator. Select a date and refresh calls. Each card shows only call details and the permitted recording download button. Click a card (or focus it and press Enter) to open the help-desk popup.
+2. In the popup, choose problems and a pharmacy. “Other” requires details. Invalid choices are rejected server-side and remain in the popup with the entered values. Closing the popup cancels without saving. The download button acts independently and does not select the card. Saving persists the rating before notifying help desk; notification failure explicitly reports that the save succeeded. Repeated submissions do not insert duplicates.
 3. Sign out and sign in as the recording-enabled operator to download a synthetic recording.
 4. Sign in as administrator. Filter by status, page through ratings, review a rating, set its status/reason and add IT notes. Closing a live rating sends feedback to its user when their email exists, as well as a help-desk notification.
 5. Export the selected status filter to Excel. The export writes caller-supplied text as text, not spreadsheet formulas.
@@ -41,7 +41,7 @@ The old paging procedure subtracts IDs and can skip filtered rows or gaps. The n
 | Route | Behaviour | Access |
 | --- | --- | --- |
 | `GET /Calls?date=yyyy-MM-dd` | Call list for the signed-in user's directory extension | Signed in |
-| `GET/POST /Calls/Rate` | Show/save call rating | Signed in; server rechecks call ownership |
+| `GET/POST /Calls/Rate` | Load/submit rating popup; full-page fallback without JavaScript | Signed in; server rechecks call ownership |
 | `GET /Calls/Recording?callId=…&date=…` | Resolve recording through API | PSP, IT, Admin; own extension |
 | `GET /Admin?page=1&statusId=…` | Filtered five-row help-desk pages | IT, Admin |
 | `GET/POST /Admin/Edit` | Review/update persisted rating | IT, Admin |

@@ -18,24 +18,55 @@ const fs = require('node:fs/promises');
     assert.equal(await page.getByRole('button', { name: 'Menu', exact: true }).isVisible(), false, 'Desktop navigation should stay expanded');
     passed.push('operator sign-in and calls; restricted recordings hidden');
 
-    await page.getByRole('link', { name: 'Report problem' }).first().click();
+    await page.route('**/Calls/Rate?**', route => route.abort());
+    await page.locator('.call-select').first().click();
+    await page.getByText('Call details could not be loaded. Close this popup and try again.', { exact: true }).waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).first().click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.unroute('**/Calls/Rate?**');
+    passed.push('popup loading failure can be closed and retried');
+
+    await page.locator('.call-select').first().click();
+    await page.getByRole('dialog').waitFor();
+    assert.equal(new URL(page.url()).pathname, '/Calls', 'Selecting a card must open a popup without navigating');
     // Submit without choosing a problem: server-side validation must preserve the form.
     await page.getByLabel('Pharmacy', { exact: true }).selectOption('1');
     await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
     await page.getByText('Select at least one problem.', { exact: true }).waitFor();
     await page.getByLabel('Poor audio', { exact: true }).check();
     await page.getByLabel('Other details', { exact: true }).fill('Browser smoke test');
+    await page.route('**/Calls/Rate', route => route.abort());
+    await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
+    await page.getByText('The save could not be confirmed.', { exact: false }).waitFor();
+    assert.equal(await page.getByLabel('Other details', { exact: true }).inputValue(), 'Browser smoke test');
+    await page.unroute('**/Calls/Rate');
+    passed.push('popup save failure preserves entered data and permits retry');
     await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
     await page.getByText('Call rating saved and help desk notified.', { exact: true }).waitFor();
-    passed.push('rating validation and save');
+    assert.equal(await page.getByRole('dialog').count(), 0);
+    passed.push('call card opens popup; validation stays in popup; save returns to cards');
 
-    await page.getByRole('link', { name: 'Report problem' }).first().click();
+    await page.locator('.call-select').first().click();
+    await page.getByRole('dialog').waitFor();
+    assert.equal(new URL(page.url()).pathname, '/Calls', 'Selecting a card must open a popup without navigating');
     await page.getByLabel('Poor audio', { exact: true }).check();
     await page.getByLabel('Pharmacy', { exact: true }).selectOption('1');
     await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
     await page.getByText('This call has already been reported. No duplicate was saved.', { exact: true }).waitFor();
     passed.push('duplicate submission protection');
 
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await page.getByRole('button', { name: 'Demo operator with recordings', exact: true }).click();
+    const callDownloadEvent = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Recording', exact: true }).first().click();
+    await callDownloadEvent;
+    assert.equal(await page.getByRole('dialog').count(), 0, 'Download must not select the card');
+    await page.locator('.call-select').first().focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('dialog').waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).last().click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    passed.push('separate card download; keyboard selection and popup cancellation');
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await page.getByRole('button', { name: 'Demo administrator', exact: true }).click();
     await page.getByRole('heading', { name: 'Help desk', exact: true }).waitFor();

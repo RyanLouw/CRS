@@ -66,3 +66,16 @@ body.crs-app { background: #E9ECEF; color: #343a40; font: 1.6rem/1.6 Arial, Helv
   .crs-app .workflow-panel { padding: 1.8rem; }
   .crs-app h1 { font-size: 2.6rem; }
 }
+.crs-app .call-select { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.crs-app .call-select:focus-visible { outline: 3px solid var(--secondary-100); outline-offset: 3px; }
+.crs-app .call-card .card-actions a { position: relative; z-index: 2; }
+.crs-app .modal-dialog { max-width: 60rem; margin: 2rem auto; }
+.crs-app .modalContainer .modal-body { width: 100%; padding: 2rem; margin: 0; }
+.crs-app .modal-header .modal-title { font-size: 2.6rem; color: var(--secondary-100); }
+.crs-app .modal-header .btn-close { background-color: transparent; min-width: 0; border: 0; }
+.crs-app .modal-only { display: none; }
+.crs-app .modal .modal-only { display: inline-block; }
+.crs-app .modal .fallback-only { display: none; }
+@media (max-width: 650px) { .crs-app .modal-dialog { margin: 1rem; } }
+
+.crs-app .call-card .call-metadata span { z-index: auto; }

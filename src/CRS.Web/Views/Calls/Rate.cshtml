@@ -2,23 +2,6 @@
 @{ ViewData["Title"] = "Report call problem"; }
 <section class="workflow-panel modalContainer">
 <h1>Report call problem</h1>
-<p>@Model.Call.CallDateTime?.ToString("yyyy-MM-dd HH:mm") · @Model.Call.CallerNumber</p>
-<form asp-action="Rate" method="post" class="workflow-form">
-    <div asp-validation-summary="All" class="text-danger" role="alert"></div>
-    <input type="hidden" asp-for="Input.CallId" /><input type="hidden" asp-for="Input.Date" />
-    <fieldset class="mb-3"><legend class="fs-5">Problems experienced</legend>
-        @foreach (var problem in Model.Lookups.Problems)
-        {
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="problem-@problem.Id" name="Input.ProblemIds" value="@problem.Id" checked="@(Model.Input.ProblemIds.Contains(problem.Id))" />
-            <label class="form-check-label" for="problem-@problem.Id">@problem.Name</label></div>
-        }
-    </fieldset>
-    <div class="mb-3"><label asp-for="Input.OtherProblem" class="form-label">Other details</label><textarea asp-for="Input.OtherProblem" class="form-control" rows="4" maxlength="4000"></textarea><span asp-validation-for="Input.OtherProblem" class="text-danger"></span></div>
-    <div class="mb-3"><label asp-for="Input.PharmacyId" class="form-label">Pharmacy</label><select asp-for="Input.PharmacyId" class="form-select"><option value="0">Select pharmacy</option>
-        @foreach (var pharmacy in Model.Lookups.Pharmacies) { <option value="@pharmacy.Id">@pharmacy.Name</option> }
-    </select></div>
-    <button class="btn btn-primary">Save rating and notify help desk</button>
-    <a class="btn btn-outline-secondary" asp-action="Index" asp-route-date="@Model.Input.Date.ToString("yyyy-MM-dd")">Cancel</a>
-</form>
+<partial name="_RatingForm" model="Model" />
 
 </section>

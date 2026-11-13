@@ -172,4 +172,50 @@ public sealed class WorkflowWebTests
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         using var calls = await client.GetAsync("/Calls"); Assert.Contains("/Account/Login", calls.Headers.Location!.ToString());
     }
+    [Fact]
+    public async Task ModalGetReturnsOnlyTheRatingForm()
+    {
+        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
+        var (_, url) = await RatingForm(client);
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("X-Rating-Modal", "true");
+        using var response = await client.SendAsync(request);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("data-rating-form", html);
+        Assert.DoesNotContain("<!DOCTYPE", html);
+    }
+    [Fact]
+    public async Task ModalInvalidPostReturns422WithPreservedFormAndNoDatabaseInsert()
+    {
+        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
+        var (html, _) = await RatingForm(client); var fields = RatingFields(html); fields.Remove("Input.ProblemIds");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/Calls/Rate") { Content = new FormUrlEncodedContent(fields) };
+        request.Headers.Add("X-Rating-Modal", "true");
+        using var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Equal(422, (int)response.StatusCode);
+        Assert.Contains("Select at least one problem", body);
+        Assert.Contains("test details", body);
+        Assert.DoesNotContain("<!DOCTYPE", body);
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal(12, (await scope.ServiceProvider.GetRequiredService<IRatingRepository>().GetRatingsAsync(null, default)).Count);
+    }
+    [Fact]
+    public async Task ModalValidPostSavesAndReturnsJsonForListRefresh()
+    {
+        using var factory = Factory(); using var client = Client(factory); await Login(client, "Operator");
+        var (html, _) = await RatingForm(client);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/Calls/Rate") { Content = new FormUrlEncodedContent(RatingFields(html)) };
+        request.Headers.Add("X-Rating-Modal", "true");
+        using var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(json.RootElement.GetProperty("saved").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("notificationSent").GetBoolean());
+        using var scope = factory.Services.CreateScope();
+        var ratings = await scope.ServiceProvider.GetRequiredService<IRatingRepository>().GetRatingsAsync(null, default);
+        Assert.Equal(13, ratings.Count);
+        Assert.Contains(ratings, r => r.OtherProblem == "test details");
+    }
 }

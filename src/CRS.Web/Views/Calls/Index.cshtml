@@ -13,9 +13,11 @@
 @foreach (var call in Model.Calls)
 {
     <article class="Float__Table call-card">
+        <a class="call-select" asp-action="Rate" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")"
+           aria-label="Report problem for call at @call.CallDateTime?.ToString("HH:mm") to @call.CallerNumber" aria-haspopup="dialog"></a>
         <div class="Flex_FloatTable">
             <div><div class="call-heading">@call.CallDateTime?.ToString("yyyy-MM-dd HH:mm")</div><div>@call.CallerFullName @call.CallerNumber</div></div>
-            <div class="card-actions"><a class="hw-btn" asp-action="Rate" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Report problem</a>
+            <div class="card-actions">
             @if ((User.IsInRole("PSP") || User.IsInRole("IT") || User.IsInRole("Admin")) && !string.IsNullOrWhiteSpace(call.RecordingKey))
             { <a class="hw-btn secondary-button" asp-action="Recording" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Recording</a> }
             </div>
@@ -23,4 +25,12 @@
         <div class="call-metadata"><span>@call.Incoming</span><span>Duration: @call.DurationMinutes minutes</span><span>Answered: @(call.IsAnswered ? "Yes" : "No")</span></div>
     </article>
 }
+</div>
+
+<div class="modal fade modalContainer" id="ratingModal" tabindex="-1" aria-labelledby="ratingModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header"><h2 class="modal-title" id="ratingModalTitle">Email Help Desk</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body" id="rating-modal-content" aria-live="polite"></div>
+    </div></div>
 </div>
