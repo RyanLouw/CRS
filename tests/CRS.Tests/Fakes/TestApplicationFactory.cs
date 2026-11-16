@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CRS.Tests.Fakes;
 
-public sealed class TestApplicationFactory(Action<IServiceCollection>? configure = null, string? logDirectory = null, string? userId = null, bool authenticated = true, string[]? roles = null) : WebApplicationFactory<Program>
+public sealed class TestApplicationFactory(Action<IServiceCollection>? configure = null, string? logDirectory = null, string? userId = null, bool authenticated = true, string[]? roles = null, Action<HttpContext>? initializeRequest = null) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -46,7 +46,7 @@ public sealed class TestApplicationFactory(Action<IServiceCollection>? configure
                     .ReturnsLazily((string key, CancellationToken ct) => demo.GetRecordingAsync(key, ct));
                 return api;
             });
-            services.AddSingleton<IStartupFilter>(new TestHostFilter(userId ?? DemoServices.OperatorId.ToString(), authenticated, roles ?? ["CallRatingSystemAdmin"]));
+            services.AddSingleton<IStartupFilter>(new TestHostFilter(userId ?? DemoServices.OperatorId.ToString(), authenticated, roles ?? ["CallRatingSystemAdmin"], initializeRequest));
             configure?.Invoke(services);
         });
     }
@@ -68,12 +68,13 @@ public sealed class TestApplicationFactory(Action<IServiceCollection>? configure
                 : AuthenticateResult.NoResult());
     }
 
-    private sealed class TestHostFilter(string userId, bool authenticated, string[] roles) : IStartupFilter
+    private sealed class TestHostFilter(string userId, bool authenticated, string[] roles, Action<HttpContext>? initializeRequest) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
             app.Use(async (context, continuation) =>
             {
+                initializeRequest?.Invoke(context);
                 if (authenticated)
                     context.User = new ClaimsPrincipal(new ClaimsIdentity(
                         [new Claim(ClaimTypes.NameIdentifier, userId), .. roles.Select(role => new Claim("roles", role))], "Test", "name", "roles"));

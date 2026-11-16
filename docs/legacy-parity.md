@@ -1,39 +1,56 @@
-# Legacy call-rating comparison
+# Legacy call-rating parity
 
-This review compares the active legacy Call List/Admin pages, mail sender, master page, API/database helpers, configuration names, email resources, and supplied SQL script against the ASP.NET Core branch. It checks source behavior; it does not establish production service connectivity. Credential values were not copied from legacy configuration.
+The ASP.NET Core branch now restores the active legacy Call List/Admin workflow while retaining the requested framework, folder, configuration, and access-rule changes. CentralConfig/API bearer-token integration is excluded at the owner's request; the owner will add it to the configured `HttpClient` in `Program.cs`. The application does not invent a replacement token protocol or fall back to demo services.
 
-## Email corrections in this change
+## Restored behavior
 
-- Added explicit `Smtp:Username` and `Smtp:Password` entries. The sender already supported them, but the JSON omitted them. Supply the values through deployment configuration, environment variables, or user secrets.
-- Restored the legacy help-desk destination, `hwvoip@rootsystem.co.za`, as the configured default. It remains overridable.
-- Restored `DebugEmail` modes under `Smtp`: `0` live, `1` debug address only, `2` disabled. `DebugEmailAddress` is required in mode 1. Every message, including closed-call user feedback, is redirected in debug mode; no live-recipient fallback occurs.
-- Development defaults to mode 2. Disabled delivery skips SMTP entirely, including when SMTP/recipient configuration is absent. The old helper attempted a send with no recipients in mode 2; that behavior is corrected.
-- Added explicit TLS and timeout settings, defaulting to TLS enabled and 300 seconds. Both credentials must be provided together for authenticated SMTP. If `From` is blank, the username is used as the sender, matching the legacy behavior.
-- Save/update results distinguish live notification success, debug-only delivery, disabled delivery, and delivery failures. Saving a rating still happens before attempting notifications.
+| Area | ASP.NET Core implementation |
+| --- | --- |
+| Login and sign-in errors | Entra configuration and middleware remain in `Program.cs`. `IUserSession` reads the logged-in ID, name, and email. Failed sign-in displays a generic retry page without exposing provider exception details. |
+| Logout | The navigation has a Log Out form. `POST /account/logout` validates antiforgery, clears the application cookie, and performs Entra sign-out. `AzureAd:SignedOutCallbackPath` and `AzureAd:PostLogoutRedirectUri` configure the callback and final destination. The default destination is the public signed-out page. |
+| SMTP settings | Explicit host/port, username/password, sender, help-desk recipient, TLS, and 300-second timeout settings are present. A blank sender falls back to the SMTP username, matching the old sender. Credentials remain external. |
+| Debug email | `Smtp:DebugEmail` matches the old modes: `0` live, `1` debug address only, `2` no email. Mode 1 redirects both help-desk and feedback messages and adds a DEBUG subject prefix. Development defaults to mode 2; missing debug settings never cause live-recipient fallback. |
+| Original email templates | The original `EmailMessage.resx` HTML is copied into embedded templates under `CRS.Core/Notifications/Templates`. New reports, help-desk updates, and user feedback use their separate original bodies and subject formats. Help-desk messages include client/host IPs; blank Other rows are omitted. Inserted values are HTML encoded. |
+| Notification sequence | Ratings/updates save first. On closure, feedback to the user is attempted even if help-desk delivery fails, as in the legacy workflow. Failures are reported without suggesting that the save should be repeated. |
+| Feedback recipient | Rating author details come from user ID; feedback email comes from the directory record matching the telephone extension, matching `CSP_GetCallRatingPage`. Missing extension recipients do not fall back to the author's address. Conflicting addresses for one extension require directory cleanup rather than selecting an arbitrary person. |
+| Client/host IPs | The connection's original remote IP is captured before forwarded headers are processed. Configured trusted proxies/networks can supply the client IP and HTTPS scheme. Ratings preserve the forwarded client IP and original peer/host IP. Arbitrary forwarding headers from untrusted clients are ignored. |
+| Debug call lookup | `CallApi:Debug=1` overrides extension/date. `DebugExtension=330` and `DebugDate=2026-10-05` reproduce the old constants and can be configured. Other modes use the actual signed-in user's extension and selected date. Ownership checks use the explicitly configured effective extension/date. Debug lookup is off by default. |
+| Optional selections and text | Pharmacy and Admin reason may be left unselected, as in the legacy forms. Supplied selections are still validated against the lookups. Legacy long Other/IT notes are preserved without the former arbitrary 4000-character cap. |
+| Rating cards and saved markers | Call cards open the reporting popup; recording downloads remain independent. Saved calls are marked Reported. The marker uses stored ratings scoped to the current user/date and survives refreshes. Server validation preserves the popup's inputs. |
+| Admin review popup | Review opens a popup with status, reason, IT note, and recording download, matching the old interaction. Validation stays in the popup; saving preserves the current filter/page. A complete page remains available when JavaScript is unavailable. |
+| Recording permissions | Call List recording links and their endpoint use the legacy role-name convention containing PSP, IT, or Admin. Hiding the button is backed by server authorization. Every Admin endpoint still requires the exact `CallRatingSystemAdmin` role, per the current requirements. |
+| Database workflow and reports | Existing rating/lookup tables and separate ADUsers database are used through EF Core. Rating inserts, status/reason/note updates, audit fields, filters, paging, and Excel/recording downloads remain available. No schema creation or seeding runs in production. |
 
-## Remaining gaps and behavior differences
+## Intended differences retained
 
-| Area | Legacy evidence | Current branch and impact |
-| --- | --- | --- |
-| Call API authentication | `CallRatingSystem/Classes/SqlConnections.cs`, `SetHttpClientTokenAsync`, obtains a token using `HW.CentralConfig.Package.Framework.SecurityTokenProvider` and attaches `Authorization: Bearer`. | `CallApiDataAccess` sends no bearer token. The old `CentralConfig:BaseUrl`, `CentralConfig:ClientId`, and `CentralConfig:AuthSalt` integration has not been migrated. Configuring only `CallApi:BaseUrl` will not satisfy an API that requires this authentication. This is the main remaining service integration gap. |
-| Logout | `MasterPages/Main.Master.cs`, `btnLogout_Click`, clears authentication cookies and redirects through Entra logout using `ida:PostLogoutRedirectUri`. | Login is configured, but there is no application logout action or navigation button. The old post-logout destination has not been migrated. |
-| Original email templates and subjects | `EmailMessage.resx` and the three send functions in the Call List/Admin controls use distinct new-rating, help-desk update, and user-feedback templates and subjects containing extension/call details. | `SmtpRatingNotifier` currently builds a simpler shared HTML body and generic subjects. Original layout and client/host IP fields in help-desk emails are missing. The data remains stored in ratings. |
-| Closed-call feedback recipient | `CSP_GetCallRatingPage` in `database/CallRatingSystemDemo.sql` joins `ADUser` by telephone extension to obtain `Mail`, used by `SendHelpDeskCallRatingStatusEmailToUser`. | `CallRatingDataAccess.Describe` resolves email by the rating's user ID. If directory ownership and extension ownership differ, the recipient can differ. The intended recipient rule needs confirmation before changing delivery. |
-| Client/host IP meaning behind a proxy | The old Call List reads raw `HTTP_X_FORWARDED_FOR` for `ClientIP` and `Request.UserHostAddress` for `HostIP`. | The controller uses server-observed remote/local addresses. Trusted forwarded-header/proxy configuration is not registered, so a reverse-proxy deployment will not reproduce those old IP meanings. Raw forwarded headers are not trusted automatically. |
-| Debug call lookup | `SqlConnections.GetDataCallStatsAsync` checks `Debug == "1"` and replaces extension/date with a hardcoded extension and date. | That override was not ported. The test project supplies fake API data instead, and production always uses the actual user's extension/date. This differs from the legacy switch but preserves user ownership checks. |
-| Paging and query implementation | Legacy pages execute stored procedures; the old page query subtracts IDs from the maximum ID. | EF Core replaces those procedures and pages the filtered ordered results. This intentionally avoids skipping rows when IDs have gaps. Existing SQLite tests cover the replacement; live SQL Server behavior still needs validation. |
-| Access rules | Legacy code redirects IT users to Admin and checks role-name substrings containing `IT`/`Admin`. | Per the current requirements, all authenticated application users can use Call List and every Admin action requires the exact `CallRatingSystemAdmin` app role. This is an intended change. |
+- Call List is available to all authenticated application users; Admin requires the exact `CallRatingSystemAdmin` Entra app role. The old IT redirect and broad Admin role-substring check are replaced by the explicitly requested rules.
+- EF Core replaces the stored-procedure data access. Filtered paging does not reproduce the old ID-subtraction bug, and repeated rating submissions do not create duplicate rows.
+- Email mode 2 skips SMTP instead of attempting a send without recipients. Saved/debug/disabled outcomes are distinguished from live notification success. HTML and spreadsheet values remain encoded as data.
+- Forwarded headers require trusted proxy configuration. The old raw-header parsing and IPv6 truncation are not reproduced.
+- Legacy SMTP/API/database/AzureAd secret values are not copied into tracked configuration. Real values must be supplied externally.
 
-## Old settings that do not need blind copying
+## Configuration mapping
 
-- `MsSqlConnection` and `MsSqlConnectionADUsers` correspond to the new `ConnectionStrings:CallRating` and `ConnectionStrings:Users` entries. Real values remain deployment requirements.
-- `StatsApiBaseUrl` corresponds to `CallApi:BaseUrl`; the current localhost default must be replaced for the real API.
-- `ida:*` login settings are replaced by `AzureAd`; the supplied ClientId/TenantId/ClientSecret placeholders still require deployment values and an Entra redirect registration.
-- `AE_Email_Send_To`, `DocFolder`, `DebugNumber`, `ADService`, and `NpgSqlConnection` have no active references in the reviewed call-rating code. The active help-desk email functions hardcode their recipient instead of reading `AE_Email_Send_To`.
-- SMS calls and email-history persistence are commented out in the legacy implementation. Generic mail CC/attachment support exists, but the reviewed call-rating callers always pass empty lists. They are not active call-rating behavior that was lost.
-- `UN_Pabx_Connection` is read by the old `GetDataCallStatsSQL` helper, but no caller of that helper was found. Active calls/recordings use the HTTP API.
-- Legacy task/patient helpers are outside the active Call List/Admin workflow and have not been migrated.
+| Old setting | New setting |
+| --- | --- |
+| `MsSqlConnection`, `MsSqlConnectionADUsers` | `ConnectionStrings:CallRating`, `ConnectionStrings:Users` |
+| `StatsApiBaseUrl` | `CallApi:BaseUrl` |
+| `Debug == 1` with hardcoded extension/date | `CallApi:Debug=1`, `CallApi:DebugExtension`, `CallApi:DebugDate` |
+| `system.net/mailSettings/smtp/network` | `Smtp:Host`, `Port`, `Username`, `Password`, `EnableSsl` |
+| SMTP username as From | `Smtp:From`, falling back to `Smtp:Username` |
+| `DebugEmail`, `DebugEmailAddress` | `Smtp:DebugEmail`, `Smtp:DebugEmailAddress` |
+| Hardcoded help-desk destination | `Smtp:HelpDesk`, defaulting to `hwvoip@rootsystem.co.za` |
+| `ida:*` login settings | `AzureAd:*`; register the app's HTTPS origin plus `/signin-oidc` in Entra |
+| `ida:PostLogoutRedirectUri` | `AzureAd:PostLogoutRedirectUri`; middleware uses `/signout-callback-oidc` as its callback |
+| Raw forwarded headers | `ReverseProxy:TrustedProxies`, `TrustedNetworks`, and `ForwardLimit` |
+| `CentralConfig:*` | Owner-provided token integration on the CallApi HttpClient; not implemented in this change |
 
-## Validation and outstanding deployment values
+## Legacy code outside the active workflow
 
-The automated suite covers local SMTP protocol/authentication, routing and suppression, managers, EF queries with SQLite, MVC workflows, Entra challenge construction with fixed local discovery metadata, and role enforcement. It does not send live email or validate a real Entra sign-in. SMTP host/credentials/sender, a debug address for mode 1, real database connections, API URL/authentication, and real AzureAd values remain necessary for the corresponding live services. Configure secrets externally; do not place them in tracked JSON.
+`AE_Email_Send_To`, `DocFolder`, `DebugNumber`, `ADService`, and `NpgSqlConnection` have no active references in the reviewed call-rating code. The mail functions hardcode the help-desk recipient instead of reading `AE_Email_Send_To`. SMS and email-history persistence are commented out. Call-rating mail callers pass empty CC/attachment lists. The old direct-PABX SQL helper has no callers; active calls and recordings use the HTTP API. Unused task/patient helpers have not been added to the new application.
+
+## Validation limits
+
+Automated tests exercise templates, recipient lookup, SMTP authentication/routing against a local server, notifications, EF queries using SQLite, proxy handling, debug overrides, MVC workflows, role enforcement, logout/callback, and the Entra challenge with fixed local discovery metadata. Chromium checks exercise cards, both popups, validation, downloads, filters/paging, saved markers, and mobile navigation.
+
+Live SQL Server, real SMTP, real Entra sign-in, and the owner's pending CentralConfig bearer-token integration still need deployment values and service validation. Source/workflow parity is not a claim that those live integrations have been tested.

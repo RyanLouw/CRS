@@ -30,11 +30,11 @@ public sealed class NotificationTests
         await notifier.NotifyAsync(new() { OtherProblem = "<script>alert(1)</script>", ITNote = "<img src=x>" }, false, default);
         A.CallTo(() => sender.SendAsync(A<NotificationMessage>.That.Matches(m => m.Html.Contains("&lt;script&gt;") && !m.Html.Contains("<script>") && !m.Html.Contains("<img")), A<CancellationToken>._)).MustHaveHappenedOnceExactly();
     }
-    [Fact] public async Task HelpDeskDeliveryFailurePropagatesWithoutUserEmail()
+    [Fact] public async Task HelpDeskFailureStillAttemptsUserFeedbackAndReportsFailure()
     {
         A.CallTo(() => sender.SendAsync(A<NotificationMessage>._, A<CancellationToken>._)).ThrowsAsync(new IOException("SMTP"));
-        await Assert.ThrowsAsync<IOException>(() => notifier.NotifyAsync(new() { StatusId = 2, Email = "user@example.invalid" }, true, default));
-        A.CallTo(() => sender.SendAsync(A<NotificationMessage>._, A<CancellationToken>._)).MustHaveHappenedOnceExactly();
+        await Assert.ThrowsAsync<DependencyException>(() => notifier.NotifyAsync(new() { StatusId = 2, Email = "user@example.invalid" }, true, default));
+        A.CallTo(() => sender.SendAsync(A<NotificationMessage>._, A<CancellationToken>._)).MustHaveHappened(2, Times.Exactly);
     }
     [Fact] public async Task MissingHelpDeskRecipientDoesNotAttemptDelivery()
     {

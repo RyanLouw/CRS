@@ -18,7 +18,12 @@ public sealed class AdminController(IAdminManager manager, IUserSession userSess
         if (!ModelState.IsValid) throw new WorkflowException("Choose a valid status and page number.");
         return View(await manager.GetPageAsync(page, statusId, ct));
     }
-    public async Task<IActionResult> Edit(long id, CancellationToken ct) => View(await manager.GetEditAsync(id, ct));
+    private bool IsModalRequest => Request.Headers["X-Rating-Modal"] == "true";
+    public async Task<IActionResult> Edit(long id, CancellationToken ct)
+    {
+        var page = await manager.GetEditAsync(id, ct);
+        return IsModalRequest ? PartialView("_EditForm", page) : View(page);
+    }
     [HttpPost]
     public async Task<IActionResult> Edit(UpdateInput input, CancellationToken ct)
     {
@@ -28,11 +33,17 @@ public sealed class AdminController(IAdminManager manager, IUserSession userSess
             {
                 var result = await manager.UpdateAsync(CurrentUserId, input, ct);
                 TempData[result.NotificationSent ? "Success" : "Warning"] = result.Message;
+                if (IsModalRequest) return Json(new { saved = result.Saved, notificationSent = result.NotificationSent });
                 return RedirectToAction(nameof(Index));
             }
         }
         catch (WorkflowException ex) { ModelState.AddModelError("", ex.Message); }
         var page = await manager.GetEditAsync(input.Id, ct);
+        if (IsModalRequest)
+        {
+            Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
+            return PartialView("_EditForm", page with { Input = input });
+        }
         return View(page with { Input = input });
     }
     public async Task<IActionResult> Recording(long id, CancellationToken ct) => Redirect(await manager.GetRecordingAsync(id, ct));

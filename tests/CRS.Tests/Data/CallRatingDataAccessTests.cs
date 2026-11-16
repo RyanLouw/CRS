@@ -108,5 +108,60 @@ public sealed class CallRatingDataAccessTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => data.AddAsync(Rating(), cancellation.Token));
         Assert.Equal(0, await context.CallRatings.CountAsync());
     }
+
+    [Fact]
+    public async Task FeedbackEmailComesFromExtensionOwnerRatherThanRatingAuthor()
+    {
+        var author = await users.Users.SingleAsync();
+        author.Extension = "999";
+        users.Users.Add(new() { Id = Guid.NewGuid(), Extension = "330", Email = "extension-owner@example.test" });
+        await users.SaveChangesAsync();
+        await data.AddAsync(Rating(), default);
+        var result = Assert.Single(await data.GetRatingsAsync(null, default));
+        Assert.Equal("extension-owner@example.test", result.Email);
+        Assert.Equal("Test user", result.DisplayName);
+        Assert.Equal(userId, result.UserId);
+    }
+
+    [Fact]
+    public async Task MissingExtensionOwnerDoesNotFallBackToAuthorsEmail()
+    {
+        await data.AddAsync(Rating() with { Extension = "unassigned" }, default);
+        Assert.Null(Assert.Single(await data.GetRatingsAsync(null, default)).Email);
+    }
+
+    [Fact]
+    public async Task AmbiguousExtensionRecipientsFailInsteadOfChoosingAnArbitraryPerson()
+    {
+        users.Users.Add(new() { Id = Guid.NewGuid(), Extension = "330", Email = "different@example.test" });
+        await users.SaveChangesAsync();
+        await data.AddAsync(Rating(), default);
+        await Assert.ThrowsAsync<DependencyException>(() => data.GetRatingsAsync(null, default));
+    }
+
+
+    [Fact]
+    public async Task ReportedRecordingKeysAreScopedToUserAndCallDate()
+    {
+        await data.AddAsync(Rating(), default);
+        await data.AddAsync(Rating("next-day.wav") with { CallDateTime = Rating().CallDateTime!.Value.AddDays(1) }, default);
+        await data.AddAsync(Rating("other-user.wav") with { UserId = Guid.NewGuid() }, default);
+        var keys = await data.GetReportedRecordingKeysAsync(userId, new DateOnly(2026, 11, 13), default);
+        Assert.Equal("call.wav", Assert.Single(keys));
+    }
+
+
+    [Fact]
+    public async Task StoresAnUnselectedAdminReasonWithoutRequiringALookupRowForZero()
+    {
+        await data.AddAsync(Rating(), default);
+        var id = (await context.CallRatings.AsNoTracking().SingleAsync()).CallRatingID;
+        await data.UpdateAsync(id, userId, DateTime.Now, new() { Id = id, StatusId = 2, ReasonId = 0 }, default);
+        var row = await data.FindAsync(id, default);
+        Assert.NotNull(row);
+        Assert.Equal(0, row.ReasonId);
+        Assert.Equal("", row.Reason);
+    }
+
     public void Dispose() { context.Dispose(); users.Dispose(); ratingsConnection.Dispose(); usersConnection.Dispose(); }
 }

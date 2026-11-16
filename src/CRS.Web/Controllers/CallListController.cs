@@ -34,9 +34,9 @@ public sealed class CallListController(ICallManager manager, TimeProvider clock,
         {
             if (ModelState.IsValid)
             {
-                // Use server-observed addresses; do not trust arbitrary X-Forwarded-For headers.
+                // Forwarded client IP is accepted only from the configured trusted proxies.
                 var result = await manager.SaveAsync(CurrentUserId, input,
-                    HttpContext.Connection.RemoteIpAddress?.ToString(), HttpContext.Connection.LocalIpAddress?.ToString(), ct);
+                    HttpContext.Connection.RemoteIpAddress?.ToString(), HttpContext.Items["OriginalRemoteIpAddress"] as string ?? HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
                 TempData[result.Saved && result.NotificationSent ? "Success" : "Warning"] = result.Message;
                 if (IsModalRequest) return Json(new { saved = result.Saved, notificationSent = result.NotificationSent });
                 return RedirectToAction(nameof(Index), new { date = input.Date.ToString("yyyy-MM-dd") });
@@ -51,6 +51,7 @@ public sealed class CallListController(ICallManager manager, TimeProvider clock,
         }
         return View(page with { Input = input });
     }
+    [Authorize(Policy = "CallRecording")]
     public async Task<IActionResult> Recording(string callId, DateOnly date, CancellationToken ct) =>
         Redirect(await manager.GetRecordingAsync(CurrentUserId, callId, date, ct));
 }

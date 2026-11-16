@@ -138,4 +138,26 @@ public sealed class AuthenticationTests
         using var response = await client.GetAsync("/CallList");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+    [Theory]
+    [InlineData("CallRatingSystemPSP", true)]
+    [InlineData("CallRatingSystemIT", true)]
+    [InlineData("CallRatingSystemAdmin", true)]
+    [InlineData("CallRatingSystemUser", false)]
+    public async Task RecordingAccessMatchesLegacyRoleConvention(string role, bool allowed)
+    {
+        using var factory = new TestApplicationFactory(roles: [role]);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false
+        });
+        using var page = await client.GetAsync("/CallList");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Equal(allowed, html.Contains(">Recording</a>"));
+        var date = DateOnly.FromDateTime(DateTime.Today);
+        using var response = await client.GetAsync($"/CallList/Recording?callId=demo-{date:yyyyMMdd}-330-1&date={date:yyyy-MM-dd}");
+        Assert.Equal(allowed ? HttpStatusCode.Redirect : HttpStatusCode.Forbidden, response.StatusCode);
+        if (allowed) Assert.Equal("/test-recording.wav", response.Headers.Location?.OriginalString);
+    }
+
 }

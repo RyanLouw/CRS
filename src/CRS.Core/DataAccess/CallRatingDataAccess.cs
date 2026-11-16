@@ -15,6 +15,14 @@ public sealed class CallRatingDataAccess(CallRatingContext context, ADUsersConte
         var user = await users.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == id, ct);
         return user is null ? null : new UserProfile(user.Id, user.Extension?.Trim() ?? "", user.DisplayName ?? "", user.Email);
     });
+    public Task<IReadOnlyList<string>> GetReportedRecordingKeysAsync(Guid userId, DateOnly date, CancellationToken ct) => Run<IReadOnlyList<string>>(async () =>
+    {
+        var start = date.ToDateTime(TimeOnly.MinValue);
+        var end = start.AddDays(1);
+        return await context.CallRatings.AsNoTracking()
+            .Where(r => r.UserID == userId && r.CallDateTime >= start && r.CallDateTime < end && r.call_id != null)
+            .Select(r => r.call_id!).Distinct().ToArrayAsync(ct);
+    });
     public Task<Lookups> GetLookupsAsync(CancellationToken ct) => Run(async () => new Lookups(
         await context.Problems.AsNoTracking().Where(x => x.Active == true).OrderBy(x => x.Id).Select(x => new Lookup(x.Id, x.Name ?? "")).ToListAsync(ct),
         await context.Pharmacies.AsNoTracking().Where(x => x.Active == true).OrderBy(x => x.Id).Select(x => new Lookup(x.Id, x.Name ?? "")).ToListAsync(ct),
@@ -36,12 +44,23 @@ public sealed class CallRatingDataAccess(CallRatingContext context, ADUsersConte
         if (rows.Count == 0) return rows;
         var ids = rows.Select(r => r.UserId).Distinct().ToArray();
         var names = await users.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, ct);
+        var extensions = rows.Select(r => r.Extension.Trim()).Where(e => e.Length > 0).Distinct().ToArray();
+        var extensionUsers = await users.Users.AsNoTracking()
+            .Where(u => u.Extension != null && extensions.Contains(u.Extension.Trim())).ToListAsync(ct);
+        var recipients = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in extensionUsers.GroupBy(u => u.Extension!.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            var emails = group.Select(u => u.Email).Where(e => !string.IsNullOrWhiteSpace(e))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (emails.Length > 1) throw new DependencyException("Multiple feedback addresses are configured for a telephone extension. Contact IT.");
+            recipients[group.Key] = emails.SingleOrDefault();
+        }
         var pharmacies = await context.Pharmacies.AsNoTracking().ToDictionaryAsync(p => p.Id, ct);
         var statuses = await context.Statuses.AsNoTracking().ToDictionaryAsync(p => p.Id, ct);
         var reasons = await context.Reasons.AsNoTracking().ToDictionaryAsync(p => p.Id, ct);
         return rows.Select(r => r with
         {
-            DisplayName = names.GetValueOrDefault(r.UserId)?.DisplayName ?? "", Email = names.GetValueOrDefault(r.UserId)?.Email,
+            DisplayName = names.GetValueOrDefault(r.UserId)?.DisplayName ?? "", Email = recipients.GetValueOrDefault(r.Extension.Trim()),
             Pharmacy = pharmacies.GetValueOrDefault(r.PharmacyId ?? 0)?.Name ?? "",
             Status = statuses.GetValueOrDefault(r.StatusId)?.Name ?? "",
             Reason = reasons.GetValueOrDefault(r.ReasonId ?? 0)?.Name ?? ""

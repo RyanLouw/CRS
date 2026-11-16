@@ -5,16 +5,16 @@ menuToggle?.addEventListener('click', () => {
     menuToggle.setAttribute('aria-expanded', String(opened));
 });
 
-const ratingModalElement = document.getElementById('ratingModal');
-if (ratingModalElement) {
+for (const ratingModalElement of document.querySelectorAll('[data-workflow-modal]')) {
     const modal = bootstrap.Modal.getOrCreateInstance(ratingModalElement);
-    const content = document.getElementById('rating-modal-content');
+    const content = ratingModalElement.querySelector('[data-workflow-content]');
+    const isAdmin = ratingModalElement.dataset.workflowKind === 'admin';
     let loadController;
     let selectedCard;
     let submitting = false;
     document.addEventListener('click', async event => {
-        const card = event.target.closest('a.call-select');
-        if (!card || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        const card = event.target.closest('a[data-workflow-open]');
+        if (!card || card.dataset.workflowOpen !== ratingModalElement.id || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
         selectedCard = card;
         loadController?.abort();
@@ -25,7 +25,7 @@ if (ratingModalElement) {
             const response = await fetch(card.href, { headers: { 'X-Rating-Modal': 'true' }, signal: loadController.signal });
             if (!response.ok || response.redirected) throw new Error('Call details unavailable');
             content.innerHTML = await response.text();
-            content.querySelector('input[type="checkbox"]')?.focus();
+            content.querySelector('input[type="checkbox"], select')?.focus();
         } catch (error) {
             if (error.name !== 'AbortError') content.textContent = 'Call details could not be loaded. Close this popup and try again.';
         }
@@ -37,7 +37,7 @@ if (ratingModalElement) {
         else loadController?.abort();
     });
     ratingModalElement.addEventListener('submit', async event => {
-        const form = event.target.closest('form[data-rating-form]');
+        const form = event.target.closest('form[data-rating-form], form[data-admin-form]');
         if (!form) return;
         event.preventDefault();
         if (submitting) return;
@@ -64,7 +64,7 @@ if (ratingModalElement) {
                 alert.setAttribute('role', 'alert');
                 form.prepend(alert);
             }
-            alert.textContent = 'The save could not be confirmed. Try again; duplicate protection prevents a second rating. If it was already saved, contact IT to check email delivery.';
+            alert.textContent = isAdmin ? 'The update could not be confirmed. Check the current status before trying again.' : 'The save could not be confirmed. Try again; duplicate protection prevents a second rating. If it was already saved, contact IT to check email delivery.';
         } finally {
             submitting = false;
             button.disabled = false;

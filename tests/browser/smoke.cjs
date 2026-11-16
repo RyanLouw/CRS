@@ -28,7 +28,7 @@ const fs = require('node:fs/promises');
     await page.getByRole('dialog').waitFor();
     assert.equal(new URL(page.url()).pathname, '/CallList', 'Selecting a card must open a popup without navigating');
     // Submit without choosing a problem: server-side validation must preserve the form.
-    await page.getByLabel('Pharmacy', { exact: true }).selectOption('1');
+    await page.getByLabel('Pharmacy', { exact: true }).selectOption('0');
     await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
     await page.getByText('Select at least one problem.', { exact: true }).waitFor();
     await page.getByLabel('Poor audio', { exact: true }).check();
@@ -41,8 +41,10 @@ const fs = require('node:fs/promises');
     passed.push('popup save failure preserves entered data and permits retry');
     await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
     await page.getByText('Call rating saved and help desk notified.', { exact: true }).waitFor();
+    await page.waitForLoadState('load');
     assert.equal(await page.getByRole('dialog').count(), 0);
-    passed.push('call card opens popup; validation stays in popup; save returns to cards');
+    await page.locator('.reported-call').first().getByText('Reported', { exact: true }).waitFor();
+    passed.push('call card opens popup; validation stays in popup; saved call is marked as reported');
 
     await page.locator('.call-select').first().click();
     await page.getByRole('dialog').waitFor();
@@ -51,6 +53,7 @@ const fs = require('node:fs/promises');
     await page.getByLabel('Pharmacy', { exact: true }).selectOption('1');
     await page.getByRole('button', { name: 'Save rating and notify help desk' }).click();
     await page.getByText('This call has already been reported. No duplicate was saved.', { exact: true }).waitFor();
+    await page.waitForLoadState('load');
     passed.push('duplicate submission protection');
 
     const callDownloadEvent = page.waitForEvent('download');
@@ -71,12 +74,21 @@ const fs = require('node:fs/promises');
     await page.getByLabel('Status', { exact: true }).selectOption('1');
     await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
     await page.getByRole('link', { name: 'Review', exact: true }).first().click();
+    await page.getByRole('dialog').waitFor();
+    assert.equal(new URL(page.url()).pathname, '/Admin', 'Admin review must open a popup without navigating');
+    await page.getByLabel('Help-desk status', { exact: true }).selectOption('0');
+    await page.getByRole('button', { name: 'Save update', exact: true }).click();
+    await page.getByRole('dialog').getByRole('alert').waitFor();
+    assert.equal(new URL(page.url()).pathname, '/Admin', 'Invalid admin update must stay in the popup');
     await page.getByLabel('Help-desk status', { exact: true }).selectOption('2');
-    await page.getByLabel('Help-desk reason', { exact: true }).selectOption('1');
+    await page.getByLabel('Help-desk reason', { exact: true }).selectOption('0');
     await page.getByLabel('IT note', { exact: true }).fill('Browser confirmed resolution');
     await page.getByRole('button', { name: 'Save update', exact: true }).click();
     await page.getByText('Help-desk update saved and notifications sent.', { exact: true }).waitFor();
-    passed.push('help-desk paging, filtering, review and update');
+    await page.waitForLoadState('load');
+    assert.equal(new URL(page.url()).searchParams.get('statusId'), '1', 'Saving must preserve the selected filter');
+    passed.push('help-desk paging, filtering, popup validation and update');
+    passed.push('legacy optional pharmacy and reason selections');
 
     const reportEvent = page.waitForEvent('download');
     await page.getByRole('link', { name: 'Export Excel', exact: true }).click();
@@ -101,5 +113,9 @@ const fs = require('node:fs/promises');
     passed.push('mobile legacy theme and navigation');
     assert.deepEqual(failures, [], 'Browser JavaScript errors');
     console.log(JSON.stringify({ passed, javascriptErrors: failures }, null, 2));
+  } catch (error) {
+    if (process.env.SCREENSHOT_PATH) await page.screenshot({ path: process.env.SCREENSHOT_PATH, fullPage: true });
+    console.error('Browser failure at', page.url(), 'JavaScript errors:', failures);
+    throw error;
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

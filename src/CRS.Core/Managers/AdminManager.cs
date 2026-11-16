@@ -39,15 +39,14 @@ public sealed class AdminManager(IRatingRepository repository, CallApiDataAccess
         var page = await GetEditAsync(input.Id, ct);
         var status = page.Lookups.Statuses.FirstOrDefault(s => s.Id == input.StatusId)
             ?? throw new WorkflowException("Select a valid help-desk status.");
-        var reason = page.Lookups.Reasons.FirstOrDefault(s => s.Id == input.ReasonId)
+        var reason = input.ReasonId == 0 ? null : page.Lookups.Reasons.FirstOrDefault(s => s.Id == input.ReasonId)
             ?? throw new WorkflowException("Select a valid help-desk reason.");
-        if (input.Note?.Length > 4000) throw new WorkflowException("IT notes must be 4000 characters or fewer.");
         var now = clock.GetLocalNow().DateTime;
         if (!await repository.UpdateAsync(input.Id, userId, now, input, ct))
             throw new MissingRecordException("The rating no longer exists.");
         Log.Information("Help-desk rating updated; rating {RatingId}", input.Id);
-        var updated = page.Rating with { StatusId = status.Id, Status = status.Name, ReasonId = reason.Id,
-            Reason = reason.Name, ITNote = input.Note?.Trim(), UpdatedAt = now, UpdatedBy = userId };
+        var updated = page.Rating with { StatusId = status.Id, Status = status.Name, ReasonId = reason?.Id ?? 0,
+            Reason = reason?.Name ?? "", ITNote = input.Note?.Trim(), UpdatedAt = now, UpdatedBy = userId };
         try
         {
             var delivery = await notifier.NotifyAsync(updated, true, ct);

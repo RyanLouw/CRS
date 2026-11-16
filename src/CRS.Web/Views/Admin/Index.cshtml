@@ -12,7 +12,7 @@
     <article class="Float__Table">
         <div class="Flex_FloatTable">
             <div><div class="call-heading">@rating.DisplayName · @rating.Extension</div><div>@rating.CallDateTime?.ToString("yyyy-MM-dd HH:mm") · @rating.NumberPhoned</div></div>
-            <div class="card-actions"><span class="setStatus">@rating.Status</span><a class="hw-btn" asp-action="Edit" asp-route-id="@rating.Id">Review</a></div>
+            <div class="card-actions"><span class="setStatus">@rating.Status</span><a class="hw-btn" asp-action="Edit" asp-route-id="@rating.Id" data-workflow-open="adminModal" aria-haspopup="dialog">Review</a></div>
         </div>
         <div class="rating-detail"><strong>@rating.Problems</strong><p>@rating.OtherProblem</p>
             <div class="call-metadata"><span>Pharmacy: @rating.Pharmacy</span><span>Captured: @rating.CaptureDate.ToString("yyyy-MM-dd HH:mm")</span><span>@rating.Reason</span></div>
@@ -25,3 +25,11 @@
     <span>Page @Model.Page of @Model.PageCount</span>
     @if (Model.Page < Model.PageCount) { <a class="hw-btn secondary-button" asp-action="Index" asp-route-page="@(Model.Page + 1)" asp-route-statusId="@Model.StatusId">Next</a> }
 </nav>
+
+<div class="modal fade modalContainer" id="adminModal" data-workflow-modal data-workflow-kind="admin" tabindex="-1" aria-labelledby="adminModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header"><h2 class="modal-title" id="adminModalTitle">Review call rating</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body" data-workflow-content aria-live="polite"></div>
+    </div></div>
+</div>

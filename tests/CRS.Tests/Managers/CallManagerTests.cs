@@ -79,10 +79,11 @@ public sealed class CallManagerTests
         var input = Input(); input.PharmacyId = 99;
         await Assert.ThrowsAsync<WorkflowException>(() => manager.SaveAsync(userId, input, null, null, default));
     }
-    [Fact] public async Task RejectsOversizedComment()
+    [Fact] public async Task PreservesLongLegacyComments()
     {
         var input = Input(); input.OtherProblem = new('x', 4001);
-        await Assert.ThrowsAsync<WorkflowException>(() => manager.SaveAsync(userId, input, null, null, default));
+        Assert.True((await manager.SaveAsync(userId, input, null, null, default)).Saved);
+        A.CallTo(() => repo.AddAsync(A<CallRating>.That.Matches(r => r.OtherProblem!.Length == 4001), A<CancellationToken>._)).MustHaveHappenedOnceExactly();
     }
     [Fact] public async Task RejectsCallIdTamperingBeforeSaving()
     {
@@ -156,6 +157,40 @@ public sealed class CallManagerTests
         Assert.True(result.Saved);
         Assert.False(result.NotificationSent);
         Assert.Contains(expected, result.Message);
+    }
+
+    [Fact]
+    public async Task ExplicitDebugModeOverridesExtensionAndDateForLoadingAndSaving()
+    {
+        var debugDate = new DateOnly(2026, 10, 5);
+        var debugCall = call with { Extension = "777", CallDateTime = new DateTime(2026, 10, 5, 9, 30, 0) };
+        A.CallTo(() => api.GetCallsAsync("777", debugDate, A<CancellationToken>._)).Returns(new[] { debugCall });
+        var debugManager = new CallManager(repo, api, notifier, clock,
+            Microsoft.Extensions.Options.Options.Create(new CallApiOptions { Debug = 1, DebugExtension = "777", DebugDate = debugDate }));
+        var page = await debugManager.GetCallsAsync(userId, date, default);
+        Assert.Equal(debugDate, page.Date);
+        Assert.Equal("777", page.User.Extension);
+        Assert.Single(page.Calls);
+        var result = await debugManager.SaveAsync(userId, Input(), null, null, default);
+        Assert.True(result.Saved);
+        A.CallTo(() => repo.AddAsync(A<CallRating>.That.Matches(r => r.UserId == userId &&
+            r.Extension == "777" && r.CallDateTime == debugCall.CallDateTime), A<CancellationToken>._)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task FlagsReportedCallsUsingTheirServerRecordingKeys()
+    {
+        A.CallTo(() => repo.GetReportedRecordingKeysAsync(userId, date, A<CancellationToken>._)).Returns(new[] { "recording.wav" });
+        var page = await manager.GetCallsAsync(userId, date, default);
+        Assert.Contains(call.CallID, page.ReportedCallIds);
+    }
+
+    [Fact]
+    public async Task AllowsOmittingPharmacyLikeTheLegacyForm()
+    {
+        var input = Input(); input.PharmacyId = 0;
+        Assert.True((await manager.SaveAsync(userId, input, null, null, default)).Saved);
+        A.CallTo(() => repo.AddAsync(A<CallRating>.That.Matches(r => r.PharmacyId == null), A<CancellationToken>._)).MustHaveHappenedOnceExactly();
     }
 
 }

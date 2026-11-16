@@ -1,0 +1,22 @@
+@model CRS.Core.Models.ViewModels.AdminEditPage
+<h2 class="fs-5">Call rating #@Model.Rating.Id</h2>
+<dl class="row"><dt class="col-sm-3">User / extension</dt><dd class="col-sm-9">@Model.Rating.DisplayName / @Model.Rating.Extension</dd>
+<dt class="col-sm-3">Call</dt><dd class="col-sm-9">@Model.Rating.CallDateTime?.ToString("yyyy-MM-dd HH:mm") / @Model.Rating.NumberPhoned</dd>
+<dt class="col-sm-3">Pharmacy</dt><dd class="col-sm-9">@Model.Rating.Pharmacy</dd>
+<dt class="col-sm-3">Problems</dt><dd class="col-sm-9">@Model.Rating.Problems</dd>
+<dt class="col-sm-3">Other details</dt><dd class="col-sm-9">@Model.Rating.OtherProblem</dd>
+<dt class="col-sm-3">Current status</dt><dd class="col-sm-9">@Model.Rating.Status / @Model.Rating.Reason</dd>
+<dt class="col-sm-3">Last updated</dt><dd class="col-sm-9">@Model.Rating.UpdatedAt?.ToString("yyyy-MM-dd HH:mm")</dd></dl>
+@if (!string.IsNullOrWhiteSpace(Model.Rating.RecordingKey)) { <p><a class="btn btn-outline-secondary" asp-action="Recording" asp-route-id="@Model.Rating.Id">Download recording</a></p> }
+<form asp-action="Edit" method="post" class="workflow-form" data-admin-form>
+    <div asp-validation-summary="All" class="text-danger" role="alert"></div><input asp-for="Input.Id" type="hidden" />
+    <div class="mb-3"><label asp-for="Input.StatusId" class="form-label">Help-desk status</label><select asp-for="Input.StatusId" class="form-select"><option value="0">Select status</option>
+        @foreach (var status in Model.Lookups.Statuses) { <option value="@status.Id">@status.Name</option> }
+    </select></div>
+    <div class="mb-3"><label asp-for="Input.ReasonId" class="form-label">Help-desk reason</label><select asp-for="Input.ReasonId" class="form-select"><option value="0">No reason selected</option>
+        @foreach (var reason in Model.Lookups.Reasons) { <option value="@reason.Id">@reason.Name</option> }
+    </select></div>
+    <div class="mb-3"><label asp-for="Input.Note" class="form-label">IT note</label><textarea asp-for="Input.Note" class="form-control" rows="4"></textarea></div>
+    <button class="btn btn-primary">Save update</button><button type="button" class="btn btn-outline-secondary modal-only" data-bs-dismiss="modal">Cancel</button>
+    <a class="btn btn-outline-secondary fallback-only" asp-action="Index">Cancel</a>
+</form>

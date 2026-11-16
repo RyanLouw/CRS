@@ -37,6 +37,17 @@ public sealed class DemoServices(TimeProvider clock, ILogger<DemoServices> logge
         return Task.FromResult<UserProfile?>(id == OperatorId || id == AdminId
             ? new(id, id == AdminId ? "331" : "330", id == AdminId ? "Demo administrator" : "Demo operator", "operator@example.invalid") : null);
     }
+    public Task<IReadOnlyList<string>> GetReportedRecordingKeysAsync(Guid userId, DateOnly date, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        lock (gate)
+        {
+            Seed();
+            return Task.FromResult<IReadOnlyList<string>>(ratings.Where(r => r.UserId == userId &&
+                r.CallDateTime.HasValue && DateOnly.FromDateTime(r.CallDateTime.Value) == date)
+                .Select(r => r.RecordingKey).Distinct().ToArray());
+        }
+    }
     public Task<Lookups> GetLookupsAsync(CancellationToken ct) { ct.ThrowIfCancellationRequested(); return Task.FromResult(lookups); }
     public Task<IReadOnlyList<CallRating>> GetRatingsAsync(long? status, CancellationToken ct)
     {
@@ -67,7 +78,7 @@ public sealed class DemoServices(TimeProvider clock, ILogger<DemoServices> logge
             Seed(); var index = ratings.FindIndex(r => r.Id == id);
             if (index < 0) return Task.FromResult(false);
             ratings[index] = ratings[index] with { StatusId = input.StatusId, Status = lookups.Statuses.First(s => s.Id == input.StatusId).Name,
-                ReasonId = input.ReasonId, Reason = lookups.Reasons.First(r => r.Id == input.ReasonId).Name,
+                ReasonId = input.ReasonId, Reason = input.ReasonId == 0 ? "" : lookups.Reasons.First(r => r.Id == input.ReasonId).Name,
                 ITNote = input.Note?.Trim(), UpdatedAt = at, UpdatedBy = userId };
             return Task.FromResult(true);
         }

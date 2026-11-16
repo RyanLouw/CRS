@@ -10,8 +10,8 @@
             <label class="form-check-label" for="problem-@problem.Id">@problem.Name</label></div>
         }
     </fieldset>
-    <div class="mb-3"><label asp-for="Input.OtherProblem" class="form-label">Other details</label><textarea asp-for="Input.OtherProblem" class="form-control" rows="4" maxlength="4000"></textarea><span asp-validation-for="Input.OtherProblem" class="text-danger"></span></div>
-    <div class="mb-3"><label asp-for="Input.PharmacyId" class="form-label">Pharmacy</label><select asp-for="Input.PharmacyId" class="form-select"><option value="0">Select pharmacy</option>
+    <div class="mb-3"><label asp-for="Input.OtherProblem" class="form-label">Other details</label><textarea asp-for="Input.OtherProblem" class="form-control" rows="4"></textarea><span asp-validation-for="Input.OtherProblem" class="text-danger"></span></div>
+    <div class="mb-3"><label asp-for="Input.PharmacyId" class="form-label">Pharmacy</label><select asp-for="Input.PharmacyId" class="form-select"><option value="0">No pharmacy selected</option>
         @foreach (var pharmacy in Model.Lookups.Pharmacies) { <option value="@pharmacy.Id">@pharmacy.Name</option> }
     </select></div>
     <button class="btn btn-primary">Save rating and notify help desk</button>

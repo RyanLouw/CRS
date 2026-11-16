@@ -12,8 +12,8 @@ tests/CRS.Tests/             Unit/integration tests and all fake/demo implementa
 ## Application structure
 
 - **CallListController**: normal-user call cards, rating popup, save and recording download.
-- **AdminController**: help-desk/IT review, filters, paging, updates, recordings and Excel export.
-- **CallApiDataAccess**: one ordinary class receiving an `HttpClient`. Calls the existing call-list and recording endpoints. `Program.cs` sets its base URL. No API auth/token provider/options hierarchy.
+- **AdminController**: help-desk review popup, filters, paging, updates, recordings and Excel export.
+- **CallApiDataAccess**: one ordinary class receiving an `HttpClient`. Calls the existing call-list and recording endpoints. `Program.cs` sets its base URL. The owner will supply the CentralConfig bearer-token integration on this HttpClient registration. CallApiOptions contains the optional legacy debug extension/date override.
 - **CallRatingContext**: EF Core context mapped to the existing ratings and lookup tables.
 - **ADUsersContext**: EF Core mapping for `ADUsers.dbo.ADUser`, which lives in the legacy system's separate directory database. Configure the Users connection to that database.
 - **CallRatingDataAccess**: EF LINQ queries and `SaveChangesAsync` for reads/writes. No raw SQL executor or stored-procedure repository. Managers still validate and coordinate saves and email notifications.
@@ -44,22 +44,27 @@ Set connection values externally using environment variables, user secrets (`dot
 | `Smtp__EnableSsl`, `Smtp__TimeoutSeconds` | TLS enabled by default; delivery timeout defaults to 300 seconds |
 | `Smtp__DebugEmail`, `Smtp__DebugEmailAddress` | `0` = live; `1` = redirect all mail to the debug address; `2` = no email |
 | `Logging__Directory` | Absolute log folder override |
+| `CallApi__Debug`, `CallApi__DebugExtension`, `CallApi__DebugDate` | Mode `1` enables the old debug lookup; defaults are extension 330/date 2026-10-05; mode `0` is live |
+| `AzureAd__SignedOutCallbackPath`, `AzureAd__PostLogoutRedirectUri` | Sign-out callback and final destination; defaults `/signout-callback-oidc` and `/Home/SignedOut` |
+| `ReverseProxy__TrustedProxies__0`, `ReverseProxy__TrustedNetworks__0`, `ReverseProxy__ForwardLimit` | Trusted proxy IP/CIDR entries and maximum forwarded hops; configure for the real deployment |
 
 Entra ID sign-in is configured entirely in `Program.cs` with Microsoft.Identity.Web and the `AzureAd` configuration section. Replace the `#{AzureAd.ClientId}#`, `#{AzureAd.TenantId}#`, and `#{AzureAd.ClientSecret}#` placeholders through deployment substitution or external configuration (`AzureAd__ClientId`, `AzureAd__TenantId`, `AzureAd__ClientSecret`). Do not commit a real client secret. Register the application's HTTPS origin plus `/signin-oidc` as a Web redirect URI in Entra. The supplied domain is `healthwindow.co.za`.
 
 Both controllers require an authenticated user with a nonempty directory GUID in the Entra `oid`/objectidentifier claim (or `ClaimTypes.NameIdentifier` for other identities). Anonymous requests challenge Entra sign-in; invalid directory identities receive 403. Controllers use the scoped `IUserSession`/`UserSession` service for the current user's directory ID, display name, and email. The object ID is an identifier, not an access token. Call List is available to authenticated application users. Every Admin action requires the exact Entra application role `CallRatingSystemAdmin` in the `roles` claim. Assign that app role to the appropriate users or groups in Entra; group membership alone must result in the app role being issued. Users without that role see the Access Denied page with HTTP 403, and the Help desk navigation link is hidden. Tests use a separate test authentication handler and do not contact Entra.
 
+The Log Out form signs out both the application cookie and Entra session through middleware configured in Program.cs. Sign-in errors display a generic retry page. Configure trusted proxy IPs/networks before using forwarded client addresses or HTTPS scheme; untrusted forwarding headers are ignored.
+
 The production app always uses the actual data-access/EF/email registrations. It does not fall back to fake data if configuration is missing. The supplied `database/CallRatingSystemDemo.sql` documents the existing tables; no schema creation, migration or seed runs automatically. Apply/manage your development schema and its ADUsers/lookup data separately. EF maps nullable legacy columns and preserves the text CallDate/CallTime fields when saving. New ratings use status 1 = Open; closure uses 2 = Closed.
 
 The SMTP credential fields are explicitly present but empty in `appsettings.json`; supply real credentials externally. The default help-desk destination is the legacy `hwvoip@rootsystem.co.za` address. `From` may be configured separately; if omitted, the authenticated SMTP username is used as the sender, matching the old application. Development overrides `Smtp:DebugEmail` to `2`, so email is disabled unless explicitly overridden. For debug mail use `Smtp__DebugEmail=1` and configure `Smtp__DebugEmailAddress`; both help-desk and user-feedback emails are redirected, with a `[DEBUG]` subject prefix. Missing debug configuration never falls back to live recipients. Saves report disabled/debug delivery separately from live notification success. Legacy mode 2 attempted to send without recipients; the new implementation skips delivery entirely.
 
-The legacy migration comparison and remaining gaps are recorded in [docs/legacy-parity.md](docs/legacy-parity.md).
+The legacy migration comparison, completed work, and remaining deployment requirements are recorded in [docs/legacy-parity.md](docs/legacy-parity.md).
 
 ## Existing screen interaction
 
-Open `/CallList` (also the default `/`). A card shows call information and its available download button. Selecting the card opens the help-desk popup for problems, pharmacy and other details. The download button does not select the card. Cancel closes the popup without saving. Server validation stays in the popup with entered values preserved. A successful submission saves the database row first, then sends email; delivery failure reports that the save succeeded. Duplicate submissions are checked in a serializable EF transaction.
+Open `/CallList` (also the default `/`). A card shows call information and its available download button. Selecting the card opens the help-desk popup for problems, pharmacy and other details. The download button does not select the card. Cancel closes the popup without saving. Server validation stays in the popup with entered values preserved. Pharmacy is optional, matching the old form, and legacy long comments remain supported. A successful submission saves the database row first, then sends email; delivery failure reports that the save succeeded. Duplicate submissions are checked in a serializable EF transaction. Previously reported calls display a Reported marker, scoped to the current user/date. Recording links and their endpoint preserve the legacy PSP/IT/Admin role-name convention.
 
-`/Admin` shows rating cards, status filters and five-row paging. Updates persist status, reason, note and audit information and notify help desk; closing also emails the rating owner when an address exists. Excel export uses literal text cells for user-entered content. The original HW logo, CSS theme, colours and floating cards are reused locally.
+`/Admin` shows rating cards, status filters and five-row paging. Review opens a popup, keeping validation inside it and preserving the selected filter/page after saving. Reason is optional, matching the old form. Updates persist status, reason, note and audit information and notify help desk; closing also emails the rating owner when an address exists. Excel export uses literal text cells for user-entered content. The original HW logo, CSS theme, colours and floating cards are reused locally.
 
 | Route | Action |
 | --- | --- |
@@ -67,7 +72,10 @@ Open `/CallList` (also the default `/`). A card shows call information and its a
 | `GET/POST /CallList/Rate` | Load/submit popup; full-page fallback without JavaScript |
 | `GET /CallList/Recording?callId=…&date=…` | Resolve the selected call's recording |
 | `GET /Admin?page=1&statusId=…` | Help-desk list/filter/page |
-| `GET/POST /Admin/Edit` | Review/update a rating |
+| `GET/POST /Admin/Edit` | Review/update popup, with full-page fallback |
+| `POST /account/logout` | Antiforgery-protected cookie and Entra sign-out |
+| `GET /Home/SignedOut` | Public sign-out confirmation |
+| `GET /Home/AuthenticationError` | Generic sign-in retry page |
 | `GET /Admin/Recording?id=…` | Resolve a saved rating's recording |
 | `GET /Admin/Export?statusId=…` | Excel report |
 

@@ -1,0 +1,182 @@
+<html>
+
+<head>
+<style>
+
+table {
+  border-collapse: collapse;
+}
+
+td, th {
+  border: 1px solid #5b9bd5;
+  text-align: left;
+  padding: 8px;
+}
+
+tr:nth-child(even) {
+  background-color: #deeaf6;
+}
+
+.tableHeader {
+background-color: #5b9bd5;
+color: white;
+
+}
+
+</style>
+</head>
+
+<body>
+
+<p>Hi,</p>
+
+<p>
+Please see status of HelpDesk on below call:
+<br/>
+<br/>
+<table>
+	<tr>
+		<td width="200px">
+			<b>
+				Status:
+			</b>
+		</td>
+		<td>
+			{HelpDeskStatus}
+		</td>
+	</tr>
+	<tr>
+		<td width="200px">
+			<b>
+				HelpDesk Reason:
+			</b>
+		</td>
+		<td>
+			{HelpDeskReason}
+		</td>
+	</tr>
+	<tr>
+		<td width="200px">
+			<b>
+				HelpDesk Note:
+			</b>
+		</td>
+		<td>
+			{ITNote}
+		</td>
+	</tr>
+	</table>
+	<br/>
+	<br/>
+	<table>
+	<tr>
+		<td colspan="2">
+			<b>Call Details:</b>
+		</td>
+	</tr>
+    <tr>
+		<td width="200px">
+			<b>
+				Client IP:
+			</b>
+		</td>
+		<td>
+			{IP}
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<b>
+				Host IP:
+			</b>
+		</td>
+		<td>
+			{HostIP}
+		</td>
+	</tr>
+	<tr>
+		<td width="200px">
+			<b>
+				Ext:
+			</b>
+		</td>
+		<td>
+			{Ext}
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<b>
+				Date
+			</b>
+		</td>
+		<td>
+			{CallDate}
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<b>
+				Time
+			</b>
+		</td>
+		<td>
+			{CallTime}
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<b>
+				Number Phoned:
+			</b>
+		</td>
+		<td>
+			{NumberDialed}
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<b>
+				Pharmacy:
+			</b>
+		</td>
+		<td>
+			{Pharmacy}
+		</td>
+	</tr>
+	<tr>
+		<td style="vertical-align: top;">
+			<b>
+				Problems:
+			</b>
+		</td>
+		<td>
+			{Ticked}
+		</td>
+	</tr>
+	<tr>
+		<td style="vertical-align: top;">
+			<b>
+				Other Problems:
+			</b>
+		</td>
+		<td>
+			{Other}
+		</td>
+	</tr>
+</table>
+<br/>
+<br/>
+</p>
+
+<p>
+Kind Regards
+<br/>
+{DisplayName}
+<br/>
+</p>
+
+
+</body>
+
+</html>

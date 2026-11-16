@@ -1,3 +1,6 @@
+using System.Net;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.HttpOverrides;
 using CRS.Core.Helpers;
 using CRS.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -34,6 +37,13 @@ try
         options.MapInboundClaims = false;
         options.TokenValidationParameters.NameClaimType = "name";
         options.TokenValidationParameters.RoleClaimType = "roles";
+        options.Events.OnRemoteFailure = context =>
+        {
+            Log.Warning("Entra sign-in failed with {ErrorType}", context.Failure?.GetType().Name);
+            context.HandleResponse();
+            context.Response.Redirect(context.Request.PathBase + "/Home/AuthenticationError");
+            return Task.CompletedTask;
+        };
     });
     builder.Services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, options =>
     {
@@ -48,6 +58,9 @@ try
     {
         options.AddPolicy("DirectoryUser", policy => policy.RequireAuthenticatedUser().RequireAssertion(context =>
             ClaimsHelpers.GetUserId(context.User).HasValue));
+        options.AddPolicy("CallRecording", policy => policy.RequireAuthenticatedUser()
+            .RequireAssertion(context => ClaimsHelpers.GetUserId(context.User).HasValue &&
+                ClaimsHelpers.CanDownloadRecordings(context.User)));
         options.AddPolicy("CallRatingSystemAdmin", policy => policy.RequireAuthenticatedUser()
             .RequireAssertion(context => ClaimsHelpers.GetUserId(context.User).HasValue)
             .RequireRole("CallRatingSystemAdmin"));
@@ -55,6 +68,16 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<IUserSession, UserSession>();
     builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.Configure<CallApiOptions>(builder.Configuration.GetSection("CallApi"));
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = builder.Configuration.GetValue<int?>("ReverseProxy:ForwardLimit") ?? 1;
+        foreach (var address in builder.Configuration.GetSection("ReverseProxy:TrustedProxies").Get<string[]>() ?? [])
+            options.KnownProxies.Add(IPAddress.Parse(address));
+        foreach (var network in builder.Configuration.GetSection("ReverseProxy:TrustedNetworks").Get<string[]>() ?? [])
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+    });
     builder.Services.AddScoped<ICallManager, CallManager>();
     builder.Services.AddScoped<IAdminManager, AdminManager>();
     builder.Services.AddDbContext<CallRatingContext>(options =>
@@ -65,6 +88,7 @@ try
     builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
     builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
     builder.Services.AddScoped<IRatingNotifier, SmtpRatingNotifier>();
+    // The owner will add CentralConfig bearer-token acquisition to this HttpClient.
     builder.Services.AddHttpClient<CallApiDataAccess>(client =>
     {
         client.BaseAddress = new Uri(builder.Configuration["CallApi:BaseUrl"]
@@ -73,6 +97,12 @@ try
     }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
     var app = builder.Build();
+    app.Use(async (context, next) =>
+    {
+        context.Items["OriginalRemoteIpAddress"] = context.Connection.RemoteIpAddress?.ToString();
+        await next();
+    });
+    app.UseForwardedHeaders();
     if (!app.Environment.IsDevelopment()) app.UseHsts();
     app.UseHttpsRedirection();
     app.UseRouting();
@@ -88,6 +118,15 @@ try
             pages.Enabled = false;
     });
     app.UseAuthorization();
+    app.MapPost("/account/logout", async Task<IResult> (HttpContext context, IAntiforgery antiforgery) =>
+    {
+        try { await antiforgery.ValidateRequestAsync(context); }
+        catch (AntiforgeryValidationException) { return Results.BadRequest("The sign-out request could not be validated."); }
+        return Results.SignOut(new Microsoft.AspNetCore.Authentication.AuthenticationProperties
+        {
+            RedirectUri = builder.Configuration["AzureAd:PostLogoutRedirectUri"] ?? "/Home/SignedOut"
+        }, [CookieAuthenticationDefaults.AuthenticationScheme, OpenIdConnectDefaults.AuthenticationScheme]);
+    }).RequireAuthorization();
     app.MapStaticAssets();
     app.MapControllerRoute("default", "{controller=CallList}/{action=Index}/{id?}").WithStaticAssets();
     Log.Information("CallRatingSystem starting");

@@ -87,3 +87,8 @@ body.crs-app { background: #E9ECEF; color: #343a40; font: 1.6rem/1.6 Arial, Helv
 .crs-app .access-denied-card .return-url span { display: block; margin-top: .5rem; font-weight: 600; }
 .crs-app .access-denied-card .actions { margin-top: 2.5rem; }
 @media (max-width: 650px) { .crs-app .access-denied-card { padding: 3rem 1.8rem; } }
+
+.crs-app .logout-form { margin: 0; }
+
+.crs-app .reported-call { border-left: .6rem solid var(--primary); }
+.crs-app .reported-label { color: var(--secondary-100); font-weight: 600; padding: .7rem; }

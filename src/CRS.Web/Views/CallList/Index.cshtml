@@ -12,13 +12,14 @@
 { <div class="alert alert-info">No calls were found for this date.</div> }
 @foreach (var call in Model.Calls)
 {
-    <article class="Float__Table call-card">
-        <a class="call-select" asp-action="Rate" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")"
+    <article class="Float__Table call-card @(Model.ReportedCallIds.Contains(call.CallID) ? "reported-call" : "")">
+        <a class="call-select" data-workflow-open="ratingModal" asp-action="Rate" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")"
            aria-label="Report problem for call at @call.CallDateTime?.ToString("HH:mm") to @call.CallerNumber" aria-haspopup="dialog"></a>
         <div class="Flex_FloatTable">
             <div><div class="call-heading">@call.CallDateTime?.ToString("yyyy-MM-dd HH:mm")</div><div>@call.CallerFullName @call.CallerNumber</div></div>
             <div class="card-actions">
-            @if (!string.IsNullOrWhiteSpace(call.RecordingKey))
+            @if (Model.ReportedCallIds.Contains(call.CallID)) { <span class="reported-label">Reported</span> }
+            @if (CRS.Core.Helpers.ClaimsHelpers.CanDownloadRecordings(User) && !string.IsNullOrWhiteSpace(call.RecordingKey))
             { <a class="hw-btn secondary-button" asp-action="Recording" asp-route-callId="@call.CallID" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")">Recording</a> }
             </div>
         </div>
@@ -27,10 +28,10 @@
 }
 </div>
 
-<div class="modal fade modalContainer" id="ratingModal" tabindex="-1" aria-labelledby="ratingModalTitle" aria-hidden="true">
+<div class="modal fade modalContainer" id="ratingModal" data-workflow-modal tabindex="-1" aria-labelledby="ratingModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
         <div class="modal-header"><h2 class="modal-title" id="ratingModalTitle">Email Help Desk</h2>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-        <div class="modal-body" id="rating-modal-content" aria-live="polite"></div>
+        <div class="modal-body" id="rating-modal-content" data-workflow-content aria-live="polite"></div>
     </div></div>
 </div>

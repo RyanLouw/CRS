@@ -6,6 +6,7 @@ namespace CRS.Core.Models;
 public interface IRatingRepository
 {
     Task<UserProfile?> GetUserAsync(Guid userId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<string>> GetReportedRecordingKeysAsync(Guid userId, DateOnly date, CancellationToken cancellationToken);
     Task<Lookups> GetLookupsAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<CallRating>> GetRatingsAsync(long? statusId, CancellationToken cancellationToken);
     Task<CallRating?> FindAsync(long id, CancellationToken cancellationToken);

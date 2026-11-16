@@ -62,10 +62,12 @@ public sealed class AdminManagerTests
         await Assert.ThrowsAsync<WorkflowException>(() => manager.UpdateAsync(Guid.NewGuid(), input, default));
         A.CallTo(() => repo.UpdateAsync(A<long>._, A<Guid>._, A<DateTime>._, A<UpdateInput>._, A<CancellationToken>._)).MustNotHaveHappened();
     }
-    [Fact] public async Task OversizedNoteIsRejected()
+    [Fact] public async Task PreservesLongLegacyNotes()
     {
         var input = Input(); input.Note = new('x', 4001);
-        await Assert.ThrowsAsync<WorkflowException>(() => manager.UpdateAsync(Guid.NewGuid(), input, default));
+        Assert.True((await manager.UpdateAsync(Guid.NewGuid(), input, default)).Saved);
+        A.CallTo(() => repo.UpdateAsync(A<long>._, A<Guid>._, A<DateTime>._, A<UpdateInput>.That.Matches(i => i.Note!.Length == 4001), A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
     }
     [Fact] public async Task UpdateUsesTrustedRecordAndSendsNotification()
     {
@@ -121,6 +123,15 @@ public sealed class AdminManagerTests
         Assert.True(result.Saved);
         Assert.False(result.NotificationSent);
         Assert.Contains(expected, result.Message);
+    }
+
+    [Fact]
+    public async Task AllowsOmittingReasonLikeTheLegacyForm()
+    {
+        var input = Input(); input.ReasonId = 0;
+        Assert.True((await manager.UpdateAsync(Guid.NewGuid(), input, default)).Saved);
+        A.CallTo(() => repo.UpdateAsync(A<long>._, A<Guid>._, A<DateTime>._, A<UpdateInput>.That.Matches(i => i.ReasonId == 0), A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
     }
 
 }

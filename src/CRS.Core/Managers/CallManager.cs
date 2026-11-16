@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using CRS.Core.Models;
 using CRS.Core.Models.DTO;
 using CRS.Core.Models.ViewModels;
@@ -7,7 +8,7 @@ using CRS.Core.DataAccess;
 namespace CRS.Core.Managers;
 
 public sealed class CallManager(IRatingRepository repository, CallApiDataAccess api, IRatingNotifier notifier,
-    TimeProvider clock) : ICallManager
+    TimeProvider clock, IOptions<CallApiOptions>? apiOptions = null) : ICallManager
 {
     public async Task<CallListPage> GetCallsAsync(Guid userId, DateOnly date, CancellationToken ct)
     {
@@ -18,13 +19,29 @@ public sealed class CallManager(IRatingRepository repository, CallApiDataAccess 
             ?? throw new WorkflowException("Your account could not be found in the user directory. Contact IT.");
         if (string.IsNullOrWhiteSpace(user.Extension))
             throw new WorkflowException("Your account does not have a telephone extension. Contact IT.");
+        var settings = apiOptions?.Value;
+        if (settings?.Debug == 1)
+        {
+            if (string.IsNullOrWhiteSpace(settings.DebugExtension) || settings.DebugDate == default ||
+                settings.DebugDate > DateOnly.FromDateTime(clock.GetLocalNow().DateTime))
+                throw new DependencyException("Configure a valid call API debug extension and date.");
+            user = user with { Extension = settings.DebugExtension.Trim() };
+            date = settings.DebugDate;
+            Log.Warning("Call API debug override is enabled");
+        }
         var calls = await api.GetCallsAsync(user.Extension, date, ct);
         // Never trust upstream data for another extension or date.
         var owned = calls.Where(c => c.Extension == user.Extension && c.CallDateTime.HasValue &&
             DateOnly.FromDateTime(c.CallDateTime.Value) == date).ToArray();
         var lookups = await repository.GetLookupsAsync(ct);
         Log.Information("Call list loaded; count {CallCount}", owned.Length);
-        return new(user, date, owned, lookups);
+        var reportedKeys = await repository.GetReportedRecordingKeysAsync(userId, date, ct);
+        return new(user, date, owned, lookups)
+        {
+            ReportedCallIds = owned.Where(call => reportedKeys.Contains(
+                string.IsNullOrWhiteSpace(call.RecordingKey) ? call.CallID : call.RecordingKey))
+                .Select(call => call.CallID).ToHashSet(StringComparer.Ordinal)
+        };
     }
 
     public async Task<RatingPage> GetRatingPageAsync(Guid userId, string callId, DateOnly date, CancellationToken ct)
@@ -49,10 +66,9 @@ public sealed class CallManager(IRatingRepository repository, CallApiDataAccess 
         var problems = page.Lookups.Problems.Where(p => ids.Contains(p.Id)).ToArray();
         if (ids.Length == 0 || problems.Length != ids.Length)
             throw new WorkflowException("Select valid problems from the list.");
-        if (input.OtherProblem?.Length > 4000) throw new WorkflowException("Other details must be 4000 characters or fewer.");
         if (problems.Any(p => p.Name.Trim().Equals("Other", StringComparison.OrdinalIgnoreCase)) && string.IsNullOrWhiteSpace(input.OtherProblem))
             throw new WorkflowException("Please describe the other problem.");
-        var pharmacy = page.Lookups.Pharmacies.FirstOrDefault(p => p.Id == input.PharmacyId)
+        var pharmacy = input.PharmacyId == 0 ? null : page.Lookups.Pharmacies.FirstOrDefault(p => p.Id == input.PharmacyId)
             ?? throw new WorkflowException("Select a valid pharmacy.");
         var rating = new CallRating
         {
@@ -61,7 +77,7 @@ public sealed class CallManager(IRatingRepository repository, CallApiDataAccess 
             CallDateTime = call.CallDateTime, NumberPhoned = call.CallerNumber,
             RecordingKey = string.IsNullOrWhiteSpace(call.RecordingKey) ? call.CallID : call.RecordingKey,
             Problems = string.Join("; ", problems.Select(p => p.Name)), OtherProblem = input.OtherProblem?.Trim(),
-            PharmacyId = pharmacy.Id, Pharmacy = pharmacy.Name, ClientIP = clientIP, HostIP = hostIP
+            PharmacyId = pharmacy?.Id, Pharmacy = pharmacy?.Name ?? "", ClientIP = clientIP, HostIP = hostIP
         };
         if (!await repository.AddAsync(rating, ct))
             return new(false, false, "This call has already been reported. No duplicate was saved.");

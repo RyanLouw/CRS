@@ -7,6 +7,19 @@ namespace CRS.Controllers;
 public sealed class HomeController : Controller
 {
     [AllowAnonymous]
+    [HttpGet]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult AuthenticationError()
+    {
+        Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return View();
+    }
+
+    [AllowAnonymous]
+    [HttpGet]
+    public IActionResult SignedOut() => View();
+
+    [AllowAnonymous]
     [IgnoreAntiforgeryToken] // Read-only error page can also render a forbidden POST.
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public IActionResult AccessDenied(string? returnUrl = null)
