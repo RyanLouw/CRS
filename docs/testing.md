@@ -6,7 +6,7 @@
 - Help-desk paging/filtering, missing records, validation, persisted update orchestration, notification failure and spreadsheet generation/formula-like text.
 - `CallApiDataAccess` URL/method/body contract, no built-in authentication, JSON parsing, HTTP errors, connection failures, timeout/cancellation and recording URLs.
 - Real EF Core queries and SaveChanges against test-only SQLite databases: active lookups, directory reads, insert/update/audit fields, duplicate detection, nullable legacy columns, filters, untrusted text, failure translation and cancellation. SQL Server-specific transaction/concurrency behaviour still needs live database validation.
-- Email recipients, closure feedback, HTML encoding and delivery/configuration errors.
+- Email recipients, closure feedback, HTML encoding and delivery/configuration errors. A local SMTP capture server verifies authenticated SMTP, sender fallback, live/debug routing and subjects. Tests also cover disabled delivery, invalid modes, missing debug addresses, incomplete credentials, and save results that distinguish live delivery from debug/disabled delivery. No real external email is sent.
 - Workflow and access-denied controllers, call-card/popup fragments, validation, antiforgery, persistence orchestration, recording downloads, admin updates/export and sanitized error responses.
 - Middleware monitoring only controller actions (not static files/unmatched requests), success/error events, and omission of query data. Serilog file output, folder errors and actual seven-day retention.
 - The test-only data fixtures remain outside Core/Web. The optional test executable hosts fake dependencies for browser checks; production has no demo switch.

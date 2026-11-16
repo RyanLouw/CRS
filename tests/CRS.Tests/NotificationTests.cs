@@ -1,4 +1,5 @@
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
 using CRS.Core.Notifications;
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -46,4 +47,36 @@ public sealed class NotificationTests
         var smtp = new SmtpEmailSender(Options.Create(new SmtpOptions()));
         await Assert.ThrowsAsync<DependencyException>(() => smtp.SendAsync(new("test@example.invalid", "Test", "Test"), default));
     }
+    [Fact]
+    public async Task DisabledNotificationsDoNotSendOrRequireRecipients()
+    {
+        var disabled = new SmtpRatingNotifier(sender, Options.Create(new SmtpOptions { DebugEmail = 2 }));
+        var outcome = await disabled.NotifyAsync(new() { StatusId = 2, Email = "user@example.test" }, true, default);
+        Assert.Equal(NotificationDeliveryStatus.Disabled, outcome);
+        A.CallTo(() => sender.SendAsync(A<NotificationMessage>._, A<CancellationToken>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task DebugModeRedirectsHelpDeskAndClosureMessages()
+    {
+        var debug = new SmtpRatingNotifier(sender, Options.Create(new SmtpOptions
+        {
+            HelpDesk = "live-helpdesk@example.test", DebugEmail = 1, DebugEmailAddress = "debug@example.test"
+        }));
+        var outcome = await debug.NotifyAsync(new() { StatusId = 2, Email = "live-user@example.test" }, true, default);
+        Assert.Equal(NotificationDeliveryStatus.Redirected, outcome);
+        A.CallTo(() => sender.SendAsync(A<NotificationMessage>.That.Matches(m => m.To == "debug@example.test"), A<CancellationToken>._))
+            .MustHaveHappened(2, Times.Exactly);
+        A.CallTo(() => sender.SendAsync(A<NotificationMessage>.That.Matches(m => m.To != "debug@example.test"), A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task DebugModeWithoutAddressDoesNotSendLiveMail()
+    {
+        var debug = new SmtpRatingNotifier(sender, Options.Create(new SmtpOptions { DebugEmail = 1, HelpDesk = "live@example.test" }));
+        await Assert.ThrowsAsync<DependencyException>(() => debug.NotifyAsync(new(), false, default));
+        A.CallTo(() => sender.SendAsync(A<NotificationMessage>._, A<CancellationToken>._)).MustNotHaveHappened();
+    }
+
 }

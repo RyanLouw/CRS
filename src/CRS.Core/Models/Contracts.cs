@@ -14,7 +14,7 @@ public interface IRatingRepository
 }
 public interface IRatingNotifier
 {
-    Task NotifyAsync(CallRating rating, bool updated, CancellationToken cancellationToken);
+    Task<NotificationDeliveryStatus> NotifyAsync(CallRating rating, bool updated, CancellationToken cancellationToken);
 }
 public interface ICallManager
 {

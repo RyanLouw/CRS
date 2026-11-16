@@ -73,8 +73,13 @@ public sealed class CallManager(IRatingRepository repository, CallApiDataAccess 
     {
         try
         {
-            await notifier.NotifyAsync(rating, false, ct);
-            return new(true, true, "Call rating saved and help desk notified.");
+            var delivery = await notifier.NotifyAsync(rating, false, ct);
+            return delivery switch
+            {
+                NotificationDeliveryStatus.Disabled => new(true, false, "Call rating saved. Email delivery is disabled by configuration."),
+                NotificationDeliveryStatus.Redirected => new(true, false, "Call rating saved. Email sent to the debug address only; help desk was not notified."),
+                _ => new(true, true, "Call rating saved and help desk notified.")
+            };
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {

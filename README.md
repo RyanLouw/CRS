@@ -40,7 +40,9 @@ Set connection values externally using environment variables, user secrets (`dot
 | `ConnectionStrings__CallRating` | Existing CallRatingSystem SQL Server database |
 | `ConnectionStrings__Users` | Existing ADUsers SQL Server database |
 | `Smtp__Host`, `Smtp__Port`, `Smtp__From`, `Smtp__HelpDesk` | Email delivery settings; default port 587 with TLS |
-| `Smtp__Username`, `Smtp__Password` | SMTP credentials if needed |
+| `Smtp__Username`, `Smtp__Password` | Supply both for authenticated SMTP; leave both empty only for an unauthenticated relay |
+| `Smtp__EnableSsl`, `Smtp__TimeoutSeconds` | TLS enabled by default; delivery timeout defaults to 300 seconds |
+| `Smtp__DebugEmail`, `Smtp__DebugEmailAddress` | `0` = live; `1` = redirect all mail to the debug address; `2` = no email |
 | `Logging__Directory` | Absolute log folder override |
 
 Entra ID sign-in is configured entirely in `Program.cs` with Microsoft.Identity.Web and the `AzureAd` configuration section. Replace the `#{AzureAd.ClientId}#`, `#{AzureAd.TenantId}#`, and `#{AzureAd.ClientSecret}#` placeholders through deployment substitution or external configuration (`AzureAd__ClientId`, `AzureAd__TenantId`, `AzureAd__ClientSecret`). Do not commit a real client secret. Register the application's HTTPS origin plus `/signin-oidc` as a Web redirect URI in Entra. The supplied domain is `healthwindow.co.za`.
@@ -48,6 +50,10 @@ Entra ID sign-in is configured entirely in `Program.cs` with Microsoft.Identity.
 Both controllers require an authenticated user with a nonempty directory GUID in the Entra `oid`/objectidentifier claim (or `ClaimTypes.NameIdentifier` for other identities). Anonymous requests challenge Entra sign-in; invalid directory identities receive 403. Controllers use the scoped `IUserSession`/`UserSession` service for the current user's directory ID, display name, and email. The object ID is an identifier, not an access token. Call List is available to authenticated application users. Every Admin action requires the exact Entra application role `CallRatingSystemAdmin` in the `roles` claim. Assign that app role to the appropriate users or groups in Entra; group membership alone must result in the app role being issued. Users without that role see the Access Denied page with HTTP 403, and the Help desk navigation link is hidden. Tests use a separate test authentication handler and do not contact Entra.
 
 The production app always uses the actual data-access/EF/email registrations. It does not fall back to fake data if configuration is missing. The supplied `database/CallRatingSystemDemo.sql` documents the existing tables; no schema creation, migration or seed runs automatically. Apply/manage your development schema and its ADUsers/lookup data separately. EF maps nullable legacy columns and preserves the text CallDate/CallTime fields when saving. New ratings use status 1 = Open; closure uses 2 = Closed.
+
+The SMTP credential fields are explicitly present but empty in `appsettings.json`; supply real credentials externally. The default help-desk destination is the legacy `hwvoip@rootsystem.co.za` address. `From` may be configured separately; if omitted, the authenticated SMTP username is used as the sender, matching the old application. Development overrides `Smtp:DebugEmail` to `2`, so email is disabled unless explicitly overridden. For debug mail use `Smtp__DebugEmail=1` and configure `Smtp__DebugEmailAddress`; both help-desk and user-feedback emails are redirected, with a `[DEBUG]` subject prefix. Missing debug configuration never falls back to live recipients. Saves report disabled/debug delivery separately from live notification success. Legacy mode 2 attempted to send without recipients; the new implementation skips delivery entirely.
+
+The legacy migration comparison and remaining gaps are recorded in [docs/legacy-parity.md](docs/legacy-parity.md).
 
 ## Existing screen interaction
 
@@ -96,4 +102,4 @@ npm test --prefix tests/browser
 
 Serilog writes daily files under `C:\CallRatingSystem\Logs` on Windows or `Logs` below the Web content root on Linux. Seven-day retention runs on file open/roll; files also roll at 100 MB. The application needs folder write permission. Request monitoring is in `Middleware/ControllerLoggingMiddleware.cs`; function-level logging is in Core functions. Controller log messages omit raw paths, queries, headers and request bodies. No log cleanup runs while the process is stopped.
 
-Tests use FakeItEasy for API/notification dependencies and SQLite **only in tests** to exercise actual EF queries, inserts, updates, null mapping and transactions. SQL Server service connectivity, live API, SMTP and future authentication setup remain for your configuration. The unused legacy task/patient controls are outside the active call-rating workflow. See `docs/testing.md` for coverage. Existing legacy configuration/history is not copied into the new projects.
+Tests use FakeItEasy for API/notification dependencies and SQLite **only in tests** to exercise actual EF queries, inserts, updates, null mapping and transactions. Live SQL Server, API bearer-token integration, real SMTP delivery, and real Entra sign-in still require deployment configuration and validation. The unused legacy task/patient controls are outside the active call-rating workflow. See `docs/testing.md` for coverage. Existing legacy configuration/history is not copied into the new projects.

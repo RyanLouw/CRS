@@ -50,8 +50,13 @@ public sealed class AdminManager(IRatingRepository repository, CallApiDataAccess
             Reason = reason.Name, ITNote = input.Note?.Trim(), UpdatedAt = now, UpdatedBy = userId };
         try
         {
-            await notifier.NotifyAsync(updated, true, ct);
-            return new(true, true, "Help-desk update saved and notifications sent.");
+            var delivery = await notifier.NotifyAsync(updated, true, ct);
+            return delivery switch
+            {
+                NotificationDeliveryStatus.Disabled => new(true, false, "Help-desk update saved. Email delivery is disabled by configuration."),
+                NotificationDeliveryStatus.Redirected => new(true, false, "Help-desk update saved. Notifications sent to the debug address only; live recipients were not notified."),
+                _ => new(true, true, "Help-desk update saved and notifications sent.")
+            };
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {

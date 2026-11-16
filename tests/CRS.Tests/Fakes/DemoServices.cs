@@ -89,10 +89,10 @@ public sealed class DemoServices(TimeProvider clock, ILogger<DemoServices> logge
         // The test-host middleware supplies this synthetic recording.
         return Task.FromResult<string?>("/test-recording.wav");
     }
-    public Task NotifyAsync(CallRating rating, bool updated, CancellationToken ct)
+    public Task<NotificationDeliveryStatus> NotifyAsync(CallRating rating, bool updated, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         logger.LogInformation("DEMO: notification simulated; no email was sent");
-        return Task.CompletedTask;
+        return Task.FromResult(NotificationDeliveryStatus.Sent);
     }
 }

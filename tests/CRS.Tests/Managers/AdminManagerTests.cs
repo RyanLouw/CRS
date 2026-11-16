@@ -111,4 +111,16 @@ public sealed class AdminManagerTests
         using var book = new XLWorkbook(stream);
         Assert.Equal(1, book.Worksheet(1).LastRowUsed()!.RowNumber());
     }
+    [Theory]
+    [InlineData(NotificationDeliveryStatus.Disabled, "disabled")]
+    [InlineData(NotificationDeliveryStatus.Redirected, "debug address")]
+    public async Task NonLiveEmailDoesNotClaimLiveRecipientsWereNotified(NotificationDeliveryStatus status, string expected)
+    {
+        A.CallTo(() => notifier.NotifyAsync(A<CallRating>._, A<bool>._, A<CancellationToken>._)).Returns(status);
+        var result = await manager.UpdateAsync(Guid.NewGuid(), Input(), default);
+        Assert.True(result.Saved);
+        Assert.False(result.NotificationSent);
+        Assert.Contains(expected, result.Message);
+    }
+
 }

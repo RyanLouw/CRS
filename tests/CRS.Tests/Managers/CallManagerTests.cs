@@ -146,4 +146,16 @@ public sealed class CallManagerTests
         await Assert.ThrowsAsync<MissingRecordException>(() => manager.GetRecordingAsync(userId, call.CallID, date, default));
         A.CallTo(() => api.GetRecordingAsync(A<string>._, A<CancellationToken>._)).MustNotHaveHappened();
     }
+    [Theory]
+    [InlineData(NotificationDeliveryStatus.Disabled, "disabled")]
+    [InlineData(NotificationDeliveryStatus.Redirected, "debug address")]
+    public async Task NonLiveEmailDoesNotClaimLiveRecipientsWereNotified(NotificationDeliveryStatus status, string expected)
+    {
+        A.CallTo(() => notifier.NotifyAsync(A<CallRating>._, A<bool>._, A<CancellationToken>._)).Returns(status);
+        var result = await manager.SaveAsync(userId, Input(), null, null, default);
+        Assert.True(result.Saved);
+        Assert.False(result.NotificationSent);
+        Assert.Contains(expected, result.Message);
+    }
+
 }
