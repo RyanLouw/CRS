@@ -1,15 +1,17 @@
+using CRS.Services;
+using Microsoft.AspNetCore.Authorization;
 using CRS.Core.Models;
+using CRS.Core.Models.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CRS.Controllers;
 
+[Authorize(Policy = "DirectoryUser")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public sealed class CallListController(ICallManager manager, TimeProvider clock, IConfiguration configuration) : Controller
+public sealed class CallListController(ICallManager manager, TimeProvider clock, IUserSession userSession) : Controller
 {
-    // Authentication is intentionally left for the owner. Replace this configuration lookup
-    // with the signed-in directory user ID when wiring authentication.
-    private Guid CurrentUserId => Guid.TryParse(configuration["CurrentUser:Id"], out var id) && id != Guid.Empty
-        ? id : throw new WorkflowException("Configure CurrentUser:Id until sign-in is connected.");
+    private Guid CurrentUserId => userSession.GetCurrentUserId()
+        ?? throw new UnauthorizedAccessException("An authenticated directory user is required.");
 
     public async Task<IActionResult> Index(DateOnly? date, CancellationToken ct)
     {

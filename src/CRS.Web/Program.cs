@@ -1,4 +1,10 @@
-using CRS.Core.Data;
+using CRS.Core.Helpers;
+using CRS.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using CRS.Core.DataAccess;
 using CRS.Core.Managers;
 using CRS.Core.Models;
 using CRS.Core.Notifications;
@@ -19,13 +25,42 @@ try
         options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
         options.Filters.Add<ControllerExceptionFilter>();
     });
+    builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+        .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
+    builder.Services.Configure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
+    {
+        options.ResponseType = OpenIdConnectResponseType.Code;
+        options.UsePkce = true;
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters.NameClaimType = "name";
+        options.TokenValidationParameters.RoleClaimType = "roles";
+    });
+    builder.Services.Configure<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+    {
+        options.AccessDeniedPath = "/Home/AccessDenied";
+        options.Events.OnRedirectToAccessDenied = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    });
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("DirectoryUser", policy => policy.RequireAuthenticatedUser().RequireAssertion(context =>
+            ClaimsHelpers.GetUserId(context.User).HasValue));
+        options.AddPolicy("CallRatingSystemAdmin", policy => policy.RequireAuthenticatedUser()
+            .RequireAssertion(context => ClaimsHelpers.GetUserId(context.User).HasValue)
+            .RequireRole("CallRatingSystemAdmin"));
+    });
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<IUserSession, UserSession>();
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddScoped<ICallManager, CallManager>();
     builder.Services.AddScoped<IAdminManager, AdminManager>();
     builder.Services.AddDbContext<CallRatingContext>(options =>
-        options.UseSqlServer(builder.Configuration["Database:CallRating"]));
+        options.UseSqlServer(builder.Configuration.GetConnectionString("CallRating")));
     builder.Services.AddDbContext<ADUsersContext>(options =>
-        options.UseSqlServer(builder.Configuration["Database:Users"]));
+        options.UseSqlServer(builder.Configuration.GetConnectionString("Users")));
     builder.Services.AddScoped<IRatingRepository, CallRatingDataAccess>();
     builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
     builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
@@ -42,6 +77,17 @@ try
     app.UseHttpsRedirection();
     app.UseRouting();
     app.UseMiddleware<ControllerLoggingMiddleware>();
+    app.UseAuthentication();
+    app.UseStatusCodePagesWithReExecute("/Home/AccessDenied");
+    app.Use(async (context, next) =>
+    {
+        await next();
+        // Render the access-denied page only for 403; preserve other error responses.
+        if (context.Response.StatusCode != StatusCodes.Status403Forbidden &&
+            context.Features.Get<Microsoft.AspNetCore.Diagnostics.IStatusCodePagesFeature>() is { } pages)
+            pages.Enabled = false;
+    });
+    app.UseAuthorization();
     app.MapStaticAssets();
     app.MapControllerRoute("default", "{controller=CallList}/{action=Index}/{id?}").WithStaticAssets();
     Log.Information("CallRatingSystem starting");

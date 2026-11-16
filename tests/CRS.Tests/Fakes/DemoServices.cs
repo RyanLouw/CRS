@@ -1,4 +1,6 @@
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
+using CRS.Core.Models.ViewModels;
 using Microsoft.Extensions.Logging;
 
 namespace CRS.Tests.Fakes;

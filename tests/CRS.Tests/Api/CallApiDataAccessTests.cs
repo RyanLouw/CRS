@@ -1,8 +1,9 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using CRS.Core.Data;
+using CRS.Core.DataAccess;
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

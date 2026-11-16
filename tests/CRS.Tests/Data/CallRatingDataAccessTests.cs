@@ -1,5 +1,6 @@
-using CRS.Core.Data;
+using CRS.Core.DataAccess;
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

@@ -1,3 +1,6 @@
+using CRS.Core.Models.DTO;
+using CRS.Core.Models.ViewModels;
+
 namespace CRS.Core.Models;
 
 public interface IRatingRepository

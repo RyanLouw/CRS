@@ -33,10 +33,10 @@ public sealed class WorkflowWebTests
         ["__RequestVerificationToken"] = Token(html), ["Input.CallId"] = Field(html, "Input.CallId"),
         ["Input.Date"] = Field(html, "Input.Date"), ["Input.ProblemIds"] = "1", ["Input.PharmacyId"] = "1", ["Input.OtherProblem"] = "test details"
     };
-    [Fact] public void ApplicationHasExactlyTheTwoRequestedControllers()
+    [Fact] public void ApplicationHasWorkflowAndAccessDeniedControllers()
     {
         var controllers = typeof(Program).Assembly.GetTypes().Where(t => !t.IsAbstract && typeof(Microsoft.AspNetCore.Mvc.Controller).IsAssignableFrom(t)).Select(t => t.Name).Order().ToArray();
-        Assert.Equal(new[] { "AdminController", "CallListController" }, controllers);
+        Assert.Equal(new[] { "AdminController", "CallListController", "HomeController" }, controllers);
     }
     [Fact] public async Task SavesRatingAndPreventsDuplicateSubmission()
     {

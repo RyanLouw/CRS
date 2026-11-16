@@ -17,7 +17,10 @@
         <button type="button" class="menu-toggle hw-btn" aria-controls="navigation-links" aria-expanded="false">Menu</button>
         <div class="navigation-links" id="navigation-links"><div class="nav_bar--items">
             <a class="hw-btn secondary-button" asp-controller="CallList" asp-action="Index">My calls</a>
-            <a class="hw-btn secondary-button" asp-controller="Admin" asp-action="Index">Help desk</a>
+            @if (User.IsInRole("CallRatingSystemAdmin"))
+            {
+                <a class="hw-btn secondary-button" asp-controller="Admin" asp-action="Index">Help desk</a>
+            }
         </div></div>
     </nav></header>
     <main class="container-fluid app-content" id="main-content">

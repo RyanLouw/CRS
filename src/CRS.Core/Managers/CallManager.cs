@@ -1,6 +1,8 @@
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
+using CRS.Core.Models.ViewModels;
 using Serilog;
-using CRS.Core.Data;
+using CRS.Core.DataAccess;
 
 namespace CRS.Core.Managers;
 

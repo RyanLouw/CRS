@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Mail;
 using System.Text.Encodings.Web;
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
 using Serilog;
 using Microsoft.Extensions.Options;
 

@@ -77,3 +77,13 @@ body.crs-app { background: #E9ECEF; color: #343a40; font: 1.6rem/1.6 Arial, Helv
 @media (max-width: 650px) { .crs-app .modal-dialog { margin: 1rem; } }
 
 .crs-app .call-card .call-metadata span { z-index: auto; }
+
+.crs-app .access-denied-wrapper { display: flex; justify-content: center; align-items: center; min-height: 60vh; padding: 2rem 0; }
+.crs-app .access-denied-card { width: 100%; max-width: 58rem; padding: 4rem 3rem; text-align: center; background: white; border-radius: 1.6rem; box-shadow: 0 4px 24px #00000014; }
+.crs-app .access-denied-card .icon-circle { display: flex; align-items: center; justify-content: center; width: 7rem; height: 7rem; margin: 0 auto 2rem; border-radius: 50%; background: #fff1e8; color: #a94412; font-size: 4rem; font-weight: 700; }
+.crs-app .access-denied-card h1 { margin-bottom: 1.5rem; color: var(--secondary-100); }
+.crs-app .access-denied-card .message { color: #495057; font-size: 1.8rem; }
+.crs-app .access-denied-card .return-url { margin: 2rem 0; color: #495057; overflow-wrap: anywhere; }
+.crs-app .access-denied-card .return-url span { display: block; margin-top: .5rem; font-weight: 600; }
+.crs-app .access-denied-card .actions { margin-top: 2.5rem; }
+@media (max-width: 650px) { .crs-app .access-denied-card { padding: 3rem 1.8rem; } }

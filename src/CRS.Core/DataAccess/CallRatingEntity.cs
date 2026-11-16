@@ -1,38 +1,5 @@
-namespace CRS.Core.Models;
+namespace CRS.Core.DataAccess;
 
-public sealed class Problem
-{
-    public long Id { get; set; }
-    public string? Name { get; set; }
-    public bool? Active { get; set; }
-}
-public sealed class Pharmacy
-{
-    public long Id { get; set; }
-    public string? Name { get; set; }
-    public bool? Active { get; set; }
-}
-public sealed class HelpDeskStatus
-{
-    public long Id { get; set; }
-    public string? Name { get; set; }
-    public bool? Active { get; set; }
-}
-public sealed class HelpDeskReason
-{
-    public long Id { get; set; }
-    public string? Name { get; set; }
-    public bool? Active { get; set; }
-}
-public sealed class DirectoryUser
-{
-    public Guid Id { get; set; }
-    public string? Extension { get; set; }
-    public string? DisplayName { get; set; }
-    public string? Email { get; set; }
-}
-
-// Nullable columns match the supplied existing SQL schema.
 public sealed class CallRatingEntity
 {
     public long CallRatingID { get; set; }

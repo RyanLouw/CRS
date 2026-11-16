@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using CRS.Core.Models;
+using CRS.Core.Models.DTO;
+using CRS.Core.Models.ViewModels;
 using CRS.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;

@@ -1,4 +1,4 @@
-@model CRS.Core.Models.AdminPage
+@model CRS.Core.Models.ViewModels.AdminPage
 @{ ViewData["Title"] = "Help desk"; }
 <div class="Filterwrapper"><div><h1>Help desk</h1><p class="text-muted">Review call problems and update their status.</p></div>
 <a class="hw-btn secondary-button" asp-action="Export" asp-route-statusId="@Model.StatusId">Export Excel</a></div>

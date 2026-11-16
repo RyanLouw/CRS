@@ -1,7 +1,9 @@
 using ClosedXML.Excel;
 using CRS.Core.Managers;
-using CRS.Core.Data;
+using CRS.Core.DataAccess;
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
+using CRS.Core.Models.ViewModels;
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;

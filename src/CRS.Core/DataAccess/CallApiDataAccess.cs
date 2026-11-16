@@ -1,9 +1,10 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
 using Serilog;
 
-namespace CRS.Core.Data;
+namespace CRS.Core.DataAccess;
 
 public class CallApiDataAccess(HttpClient client)
 {

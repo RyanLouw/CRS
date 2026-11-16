@@ -4,8 +4,8 @@ Open the root **CRS.slnx** in a .NET 10-compatible IDE. It contains:
 
 ```text
 CallRatingSystem/             Existing Framework 4.8 project (default build excluded)
-src/CRS.Web/                  MVC views, two controllers, middleware, Program.cs
-src/CRS.Core/                 Models, managers, data access, EF Core contexts
+src/CRS.Web/                  MVC views, workflow/error controllers, middleware, Program.cs
+src/CRS.Core/                 Models/DTO, Models/ViewModels, managers, DataAccess entities and EF Core contexts
 tests/CRS.Tests/             Unit/integration tests and all fake/demo implementations
 ```
 
@@ -37,14 +37,15 @@ Set connection values externally using environment variables, user secrets (`dot
 | Setting | Purpose |
 | --- | --- |
 | `CallApi__BaseUrl` | Base URL, configured on `AddHttpClient<CallApiDataAccess>` in Program.cs |
-| `Database__CallRating` | Existing CallRatingSystem SQL Server database |
-| `Database__Users` | Existing ADUsers SQL Server database |
-| `CurrentUser__Id` | Temporary server-configured directory user GUID until you wire sign-in |
+| `ConnectionStrings__CallRating` | Existing CallRatingSystem SQL Server database |
+| `ConnectionStrings__Users` | Existing ADUsers SQL Server database |
 | `Smtp__Host`, `Smtp__Port`, `Smtp__From`, `Smtp__HelpDesk` | Email delivery settings; default port 587 with TLS |
 | `Smtp__Username`, `Smtp__Password` | SMTP credentials if needed |
 | `Logging__Directory` | Absolute log folder override |
 
-Authentication and role enforcement are deliberately left for you to connect later. There is no sign-in controller, Security folder, role-policy scaffolding, or demo branch in production code. `CurrentUser:Id` is a temporary server-side identity hookup, not authentication. Both controllers currently have no access policy. Replace that lookup with your signed-in user's directory ID and add your user/IT/admin permissions when wiring authentication. API authorization headers can be added to the configured HttpClient when ready; the data-access class does not require any authentication setup now.
+Entra ID sign-in is configured entirely in `Program.cs` with Microsoft.Identity.Web and the `AzureAd` configuration section. Replace the `#{AzureAd.ClientId}#`, `#{AzureAd.TenantId}#`, and `#{AzureAd.ClientSecret}#` placeholders through deployment substitution or external configuration (`AzureAd__ClientId`, `AzureAd__TenantId`, `AzureAd__ClientSecret`). Do not commit a real client secret. Register the application's HTTPS origin plus `/signin-oidc` as a Web redirect URI in Entra. The supplied domain is `healthwindow.co.za`.
+
+Both controllers require an authenticated user with a nonempty directory GUID in the Entra `oid`/objectidentifier claim (or `ClaimTypes.NameIdentifier` for other identities). Anonymous requests challenge Entra sign-in; invalid directory identities receive 403. Controllers use the scoped `IUserSession`/`UserSession` service for the current user's directory ID, display name, and email. The object ID is an identifier, not an access token. Call List is available to authenticated application users. Every Admin action requires the exact Entra application role `CallRatingSystemAdmin` in the `roles` claim. Assign that app role to the appropriate users or groups in Entra; group membership alone must result in the app role being issued. Users without that role see the Access Denied page with HTTP 403, and the Help desk navigation link is hidden. Tests use a separate test authentication handler and do not contact Entra.
 
 The production app always uses the actual data-access/EF/email registrations. It does not fall back to fake data if configuration is missing. The supplied `database/CallRatingSystemDemo.sql` documents the existing tables; no schema creation, migration or seed runs automatically. Apply/manage your development schema and its ADUsers/lookup data separately. EF maps nullable legacy columns and preserves the text CallDate/CallTime fields when saving. New ratings use status 1 = Open; closure uses 2 = Closed.
 

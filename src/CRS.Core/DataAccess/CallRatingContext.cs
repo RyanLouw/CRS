@@ -1,7 +1,7 @@
-using CRS.Core.Models;
+using CRS.Core.Models.DTO;
 using Microsoft.EntityFrameworkCore;
 
-namespace CRS.Core.Data;
+namespace CRS.Core.DataAccess;
 
 public sealed class CallRatingContext(DbContextOptions<CallRatingContext> options) : DbContext(options)
 {

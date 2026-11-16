@@ -1,10 +1,12 @@
 using System.Data;
 using System.Data.Common;
 using CRS.Core.Models;
+using CRS.Core.Models.DTO;
+using CRS.Core.Models.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
-namespace CRS.Core.Data;
+namespace CRS.Core.DataAccess;
 
 public sealed class CallRatingDataAccess(CallRatingContext context, ADUsersContext users) : IRatingRepository
 {

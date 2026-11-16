@@ -1,4 +1,4 @@
-@model CRS.Core.Models.RatingPage
+@model CRS.Core.Models.ViewModels.RatingPage
 <p>@Model.Call.CallDateTime?.ToString("yyyy-MM-dd HH:mm") · @Model.Call.CallerNumber</p>
 <form asp-action="Rate" method="post" class="workflow-form" data-rating-form>
     <div asp-validation-summary="All" class="text-danger" role="alert"></div>

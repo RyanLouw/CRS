@@ -1,7 +1,6 @@
-using CRS.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace CRS.Core.Data;
+namespace CRS.Core.DataAccess;
 
 // The legacy system keeps its user directory in a separate database.
 public sealed class ADUsersContext(DbContextOptions<ADUsersContext> options) : DbContext(options)
