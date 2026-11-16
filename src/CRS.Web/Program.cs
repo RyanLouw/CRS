@@ -73,9 +73,11 @@ try
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
         options.ForwardLimit = builder.Configuration.GetValue<int?>("ReverseProxy:ForwardLimit") ?? 1;
-        foreach (var address in builder.Configuration.GetSection("ReverseProxy:TrustedProxies").Get<string[]>() ?? [])
+        var proxies = builder.Configuration.GetSection("ReverseProxy:TrustedProxies").Get<string[]>() ?? [];
+        var networks = builder.Configuration.GetSection("ReverseProxy:TrustedNetworks").Get<string[]>() ?? [];
+        foreach (var address in proxies.SelectMany(value => value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
             options.KnownProxies.Add(IPAddress.Parse(address));
-        foreach (var network in builder.Configuration.GetSection("ReverseProxy:TrustedNetworks").Get<string[]>() ?? [])
+        foreach (var network in networks.SelectMany(value => value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)))
             options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
     });
     builder.Services.AddScoped<ICallManager, CallManager>();
