@@ -88,6 +88,21 @@ public sealed class SmtpEmailSenderTests
         Assert.Contains("sender@example.test", message.From, StringComparison.OrdinalIgnoreCase);
     }
 
+
+    [Theory]
+    [InlineData("#{Smtp.Host}#", "sender@example.test", "test-password")]
+    [InlineData("127.0.0.1", "#{Smtp.Username}#", "test-password")]
+    [InlineData("127.0.0.1", "sender@example.test", "#{Smtp.Password}#")]
+    public async Task UnresolvedDeploymentPlaceholdersFailBeforeSmtpDelivery(string host, string username, string password)
+    {
+        var sender = new SmtpEmailSender(Options.Create(new SmtpOptions
+        {
+            Host = host, Username = username, Password = password, From = "sender@example.test"
+        }));
+        var error = await Assert.ThrowsAsync<DependencyException>(() => sender.SendAsync(new("debug@example.test", "Test", "Test"), default));
+        Assert.Contains("deployment placeholders", error.Message);
+    }
+
     private sealed record CapturedMessage(string From, List<string> Recipients, string Data, string? Username, string? Password);
 
     private sealed class SmtpCapture : IDisposable

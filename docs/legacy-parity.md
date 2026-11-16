@@ -8,8 +8,8 @@ The ASP.NET Core branch now restores the active legacy Call List/Admin workflow 
 | --- | --- |
 | Login and sign-in errors | Entra configuration and middleware remain in `Program.cs`. `IUserSession` reads the logged-in ID, name, and email. Failed sign-in displays a generic retry page without exposing provider exception details. |
 | Logout | The navigation has a Log Out form. `POST /account/logout` validates antiforgery, clears the application cookie, and performs Entra sign-out. `AzureAd:SignedOutCallbackPath` and `AzureAd:PostLogoutRedirectUri` configure the callback and final destination. The default destination is the public signed-out page. |
-| SMTP settings | Explicit host/port, username/password, sender, help-desk recipient, TLS, and 300-second timeout settings are present. A blank sender falls back to the SMTP username, matching the old sender. Credentials remain external. |
-| Debug email | `Smtp:DebugEmail` matches the old modes: `0` live, `1` debug address only, `2` no email. Mode 1 redirects both help-desk and feedback messages and adds a DEBUG subject prefix. Development defaults to mode 2; missing debug settings never cause live-recipient fallback. |
+| SMTP settings | Explicit host/port, username/password, sender, help-desk recipient, TLS, and 300-second timeout settings are present. A blank sender falls back to the SMTP username, matching the old sender. The legacy host/port and non-secret AE/debug recipient settings are carried over; username/password use explicit deployment placeholders and real credentials remain external. |
+| Debug email | `Smtp:DebugEmail` matches the old modes: `0` live, `1` debug address only, `2` no email. Mode 1 redirects both help-desk and feedback messages and adds a DEBUG subject prefix. Base and Development configuration restore legacy mode 1 and its debug address; missing debug settings never cause live-recipient fallback. |
 | Original email templates | The original `EmailMessage.resx` HTML is copied into embedded templates under `CRS.Core/Notifications/Templates`. New reports, help-desk updates, and user feedback use their separate original bodies and subject formats. Help-desk messages include client/host IPs; blank Other rows are omitted. Inserted values are HTML encoded. |
 | Notification sequence | Ratings/updates save first. On closure, feedback to the user is attempted even if help-desk delivery fails, as in the legacy workflow. Failures are reported without suggesting that the save should be repeated. |
 | Feedback recipient | Rating author details come from user ID; feedback email comes from the directory record matching the telephone extension, matching `CSP_GetCallRatingPage`. Missing extension recipients do not fall back to the author's address. Conflicting addresses for one extension require directory cleanup rather than selecting an arbitrary person. |
@@ -39,6 +39,7 @@ The ASP.NET Core branch now restores the active legacy Call List/Admin workflow 
 | `system.net/mailSettings/smtp/network` | `Smtp:Host`, `Port`, `Username`, `Password`, `EnableSsl` |
 | SMTP username as From | `Smtp:From`, falling back to `Smtp:Username` |
 | `DebugEmail`, `DebugEmailAddress` | `Smtp:DebugEmail`, `Smtp:DebugEmailAddress` |
+| `AE_Email_Send_To` | `Smtp:AE_Email_Send_To`; retained separately from call-rating recipients |
 | Hardcoded help-desk destination | `Smtp:HelpDesk`, defaulting to `hwvoip@rootsystem.co.za` |
 | `ida:*` login settings | `AzureAd:*`; register the app's HTTPS origin plus `/signin-oidc` in Entra |
 | `ida:PostLogoutRedirectUri` | `AzureAd:PostLogoutRedirectUri`; middleware uses `/signout-callback-oidc` as its callback |
@@ -47,7 +48,7 @@ The ASP.NET Core branch now restores the active legacy Call List/Admin workflow 
 
 ## Legacy code outside the active workflow
 
-`AE_Email_Send_To`, `DocFolder`, `DebugNumber`, `ADService`, and `NpgSqlConnection` have no active references in the reviewed call-rating code. The mail functions hardcode the help-desk recipient instead of reading `AE_Email_Send_To`. SMS and email-history persistence are commented out. Call-rating mail callers pass empty CC/attachment lists. The old direct-PABX SQL helper has no callers; active calls and recordings use the HTTP API. Unused task/patient helpers have not been added to the new application.
+`DocFolder`, `DebugNumber`, `ADService`, and `NpgSqlConnection` have no active references in the reviewed call-rating code. The legacy mail functions hardcode the help-desk recipient instead of reading `AE_Email_Send_To`. That AE address list is nevertheless restored explicitly in `Smtp:AE_Email_Send_To` for configuration parity; it is not automatically added to call-rating notifications. SMS and email-history persistence are commented out. Call-rating mail callers pass empty CC/attachment lists. The old direct-PABX SQL helper has no callers; active calls and recordings use the HTTP API. Unused task/patient helpers have not been added to the new application.
 
 ## Validation limits
 

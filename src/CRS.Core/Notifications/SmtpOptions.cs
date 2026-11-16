@@ -8,6 +8,7 @@ public sealed class SmtpOptions
     public int Port { get; set; } = 587;
     public string From { get; set; } = "";
     public string HelpDesk { get; set; } = "";
+    public string AE_Email_Send_To { get; set; } = "";
     public string? Username { get; set; }
     public string? Password { get; set; }
     public bool EnableSsl { get; set; } = true;

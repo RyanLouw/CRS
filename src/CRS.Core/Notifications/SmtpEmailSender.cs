@@ -19,6 +19,9 @@ public sealed class SmtpEmailSender(IOptions<SmtpOptions> options) : IEmailSende
             Log.Information("SMTP delivery suppressed by email configuration");
             return;
         }
+        if (new[] { settings.Host, settings.Username, settings.Password, settings.From }
+            .Any(value => value is not null && value.StartsWith("#{", StringComparison.Ordinal) && value.EndsWith("}#", StringComparison.Ordinal)))
+            throw new DependencyException("Replace the SMTP deployment placeholders or override them through secure configuration before sending email.");
         var from = string.IsNullOrWhiteSpace(settings.From) ? settings.Username : settings.From;
         if (string.IsNullOrWhiteSpace(settings.Host) || string.IsNullOrWhiteSpace(from))
             throw new DependencyException("Email delivery has not been configured.");
